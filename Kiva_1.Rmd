@@ -89,7 +89,6 @@ kiva_loan.join.s1 <- distinct(kiva_loan.join.s)
 kiva_loan.join.s.d <- kiva_loan.join.s1%>%group_by(country,sector)%>%mutate(loan_amount.sector=sum(loan_amount))%>%group_by(country,activity)%>%mutate(loan_amount.activity=sum(loan_amount))
 
 head(kiva_loan1)
-sum(kiva_loan1$funded_amount)-sum(kiva_loan1$loan_amount)
 
 ```
 
