@@ -1,8 +1,8 @@
 ---
 title: "Lardieri Midterm Project - Kiva Loans"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
   word_document: default
 ---
 
@@ -15,12 +15,9 @@ My interest is in the social sciences, and the use of data science for social go
 I chose my project because it aligns with my goal of working with data for social good. 
  
 Kiva.org is an international nonprofit whose mission is to connect people through lending to help alleviate poverty. Kiva supports 3 million borrowers in more than 80 countries, empowering people to create opportunities for themselves, their families, and their communities. My project aims to take a deeper look at the Kiva data, to see if there are any underlying themes or behaviors that differ between regions and countries. Specifically, is there variation in category and amount of funding and to whom. 
-
-Specifically:
-Is there variation in what/how much is being funded? 
 - Most imporverished areas
 - What is being funded/partially funded/not funded and likelihood?
-- Female vs. male borrowers and whether having a male in the group effects loan behavior?
+- Female vs. male borrowers and whether having a male in the group affects loan behavior?
 - Repeat and type of borrowers
 
 EDA plot outcome on number of F and number of male and ratio of male count to female count to inform us whether count and proportion make sense. 
@@ -53,6 +50,7 @@ library(tidyr)
 library(arm)
 library(DT)
 library(gridExtra)
+library(kableExtra)
 # read kiva data
 df<-read.csv("kiva_loans.csv",na.strings = c("","NA"))
 # separate tags (for example, "Elderly, Woman Owned Biz") and remove # from text
@@ -88,7 +86,8 @@ kiva_loan.join.d <- distinct(kiva_loan.join)
 kiva_loan.join.s <- kiva_loan1%>%dplyr::select(funded_amount,loan_amount,country,sector,activity)
 kiva_loan.join.s1 <- distinct(kiva_loan.join.s)
 kiva_loan.join.s.d <- kiva_loan.join.s1%>%group_by(country,sector)%>%mutate(loan_amount.sector=sum(loan_amount),funded_amount.sector=sum(funded_amount))%>%group_by(country,activity)%>%mutate(loan_amount.activity=sum(loan_amount),funded_amount.activity=sum(funded_amount))
-grid.table(head(kiva_loan1))
+kiva_loan1_head <- kiva_loan1[1:6,]
+kable(kiva_loan1_head,"latex",booktabs=T)
 ```
 
 ```{r, echo=FALSE, message=FALSE}
@@ -213,7 +212,7 @@ p.k2 <- k.region%>%filter(year=="2015")%>%top_n(n=5,wt=Frequency)%>%ggplot(aes(x
 p.k3 <- k.region%>%filter(year=="2016")%>%top_n(n=5,wt=Frequency)%>%ggplot(aes(x=reorder(region,-Frequency),y=Frequency))+geom_bar(stat="identity",fill="tomato1")+facet_wrap(~year)+labs(x="",y="")
 p.k4 <- k.region%>%filter(year=="2017")%>%top_n(n=5,wt=Frequency)%>%ggplot(aes(x=reorder(region,-Frequency),y=Frequency))+geom_bar(stat="identity",fill="tomato1")+facet_wrap(~year)+labs(x="",y="")
 
-grid.arrange(p.k1,p.k2,p.k3,p.k4, nrow=2, bottom="Region",left="Frequency", top=textGrob("Top 5 Funded Regions per Year",gp=gpar(fontsize=15,font=10)))
+grid.arrange(p.k1,p.k2,p.k3,p.k4, nrow=2, bottom="Region",left="Frequency", top=textGrob("Top 5 Funded Regions per Year",gp=gpar(fontsize=21,font=10)))
 ```
 
 From the bar plot, there is a mix of top regions that are top funded per year. 
@@ -317,15 +316,17 @@ top.3.Africa1 <- top.3.Africa%>%mutate(allother=ifelse(sector=="Agriculture","Ag
 #change order
 top.3.Africa1$allother <- factor(top.3.Africa1$allother, levels = c("All Other","Retail","Food","Agriculture"))
 top.3.Africa1 <- as.data.frame(top.3.Africa1)
+# log scale
+top.3.Africa1$log.funded_amount.sector <- log(top.3.Africa1$funded_amount.sector)
 
-top.3.p2 <- ggplot(top.3.Africa1, aes(y=loan_amount.sector,x=reorder(country,-loan_amount.sector),fill=allother))+geom_bar(stat="identity")+guides(fill=guide_legend(title="Sector"))+theme(text=element_text(size=19),axis.text.x=element_text(angle=30, hjust=1))+labs(title = "", subtitle = "", y="",x="")
+top.3.p2 <- ggplot(top.3.Africa1, aes(y=log.funded_amount.sector,x=reorder(country,-log.funded_amount.sector),fill=allother))+geom_bar(stat="identity")+guides(fill=guide_legend(title="Sector"))+theme(text=element_text(size=19),axis.text.x=element_text(angle=30, hjust=1))+labs(title = "", subtitle = "", y="",x="")
 
 
-grid.arrange(top.3.p2, nrow=1,left=textGrob("Funded Loans",rot=90, gp=gpar(fontsize=14)),bottom=textGrob("Country", gp=gpar(fontsize=14,font=11)),top=textGrob("Relationship Between Sub-Saharan Africa and Top Sectors ", gp=gpar(fontsize=14,font=11)))
+grid.arrange(top.3.p2, nrow=1,left=textGrob("Funded Loans",rot=90, gp=gpar(fontsize=19)),bottom=textGrob("Country", gp=gpar(fontsize=19,font=11)),top=textGrob("Relationship Between Sub-Saharan Africa and Top Sectors ", gp=gpar(fontsize=19,font=11)))
 ```
 
 #How are loans being used?
-```{r, echo=FALSE,fig.height=10, fig.width=10,message=FALSE}
+```{r, echo=FALSE,fig.height=10, fig.width=10,message=FALSE, warning=FALSE}
 # countries with funded loans only
 kl4 <- kiva_loan1%>%filter(funded_amount>0)
 # create data frame
@@ -344,7 +345,7 @@ grid.arrange(p9,p10,p11,p12, nrow=4, bottom="Frequency",left="Use of Loan", top=
 From the bar plots, there is some variation in the use of the loan. For water uses, does this vary by region and become more prominent during dry seasons? If there is an expected dry season can we expect water loans to increase?
 
 ##Where is the use of water loan most prevelant?
-```{r, echo=FALSE,message=FALSE}
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
 water <- kiva_loan1%>%filter(funded_amount>0)%>%dplyr::select(country,Water)%>%group_by(country)%>%summarise(watertotal=sum(Water),watercount=n())
 water1 <- water%>%arrange(desc(watercount))%>%slice(1:5)
 plotwater <- ggplot(water1, aes(x=reorder(country,-watercount),y=watercount))+geom_bar(stat="identity",fill="light blue")+scale_fill_manual(values=c("#66CC33"))+theme(plot.title=element_text(hjust =0.5,size=19))+labs(title = "Top 5 Funded Water Loans", y="Frequency",x="Country")
@@ -352,7 +353,7 @@ plotwater
 
 ```
 #Loan Breakdown by Gender
-```{r echo=FALSE, fig.height=8, fig.width=12}
+```{r echo=FALSE, fig.height=8, fig.width=12,warning=FALSE}
 # log transform
 kiva_loan1$log.funded <- log(kiva_loan1$funded_amount)
 
@@ -382,7 +383,7 @@ From the violin plots, there is a difference in the average funded loan amount (
 
 We may see even bigger differences by looking at the gender differences across World Regions and Countries and over time. 
 
-```{r, echo=FALSE, fig.height=8, fig.width=12}
+```{r, echo=FALSE, fig.height=8, fig.width=12,warning=FALSE}
 ggplot(kiva_loan1, aes(x=Gender, y=log.funded,fill=Gender)) + 
   geom_violin()+labs(title = "", y="",x="")+
   stat_summary(fun.y=mean, geom="point", shape=20, size=10, color="red", fill="red") +
@@ -395,13 +396,12 @@ From the violin plots by year, the average loans overall seem to be decreasing, 
 
 We may see something interesting across World Regions and Countries. 
 
-```{r, echo=FALSE, fig.height=8, fig.width=12}
+```{r, echo=FALSE, fig.height=8, fig.width=12,warning=FALSE}
 # need to join mpi for world region information with gender
 kiva_loan1.red <- kiva_loan1%>%dplyr::select(partner_id, funded_amount, loan_amount, sector, activity, country, use, term_in_months, year, tags, Gender, Gender.Var, Water, log.funded)
 
 kiva_loan1.gr <- world.region%>%left_join(kiva_loan1.red,by="country")%>%na.omit()
 kiva_loan1.gr1 <- kiva_loan1.gr%>%filter(kiva_loan1.gr$world_region=="South Asia"|kiva_loan1.gr$world_region=="Sub-Saharan Africa")
-kiva_loan1.gr1
 
 # add face_wrap by world_region
 ggplot(kiva_loan1.gr1, aes(x=Gender, y=log.funded)) + 
