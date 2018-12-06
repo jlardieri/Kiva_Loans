@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ##Abstract
 My interest is in the social sciences, and the use of data science for social good. From improving global health to city infrastructure, we can use data to help solve major societal issues. In my career, I'd like to contribute to these efforts.
 
-I chose my project because it aligns with my goal of working with data for social good. 
+I chose my project because it aligns with my goal of working with data for social good. I will see whether loans are su
  
 Kiva.org is an international nonprofit whose mission is to connect people through lending to help alleviate poverty. Kiva supports 3 million borrowers in more than 80 countries, empowering people to create opportunities for themselves, their families, and their communities. My project aims to take a deeper look at the Kiva data, to see if there are any underlying themes or behaviors that differ between regions and countries. Specifically, is there variation in category and amount of funding and to whom. 
 - Most imporverished areas
@@ -42,6 +42,8 @@ funded, partially funded, or not funded
 female vs male probability of getting funded
 type of loan probability of getting funded
 
+how effective are loans? repeat borrowers, type of loan (6 type of loans given)
+
 #Dataset 1: Kiva loan
 The dataset contains the majority of the loan detail. 
 ```{r, echo=FALSE, message=FALSE,warning=FALSE}
@@ -51,8 +53,11 @@ library(arm)
 library(DT)
 library(gridExtra)
 library(kableExtra)
+library(stringr)
+library(knitr)
 # read kiva data
 df<-read.csv("kiva_loans.csv",na.strings = c("","NA"))
+kiva_loan
 # separate tags (for example, "Elderly, Woman Owned Biz") and remove # from text
 kiva_loan <- df%>%mutate(tags=strsplit(as.character(tags),","))%>%unnest(tags)
 kiva_loan$tags <- gsub("#","",kiva_loan$tags, fixed=TRUE)
@@ -65,6 +70,16 @@ kiva_loan <- kiva_loan[order(kiva_loan$id),]
 
 # select specific columns
 kiva_loan1 <- kiva_loan%>%dplyr::select(partner_id, funded_amount,loan_amount,sector,activity,country,region,borrower_genders,use, term_in_months,date,month,year,tags)%>%na.omit()
+
+# count number of female / male per loan
+kiva_loan1$Female.count <- str_count(kiva_loan1$borrower_genders, "\\bfemale\\b")
+kiva_loan1$Male.count <- str_count(kiva_loan1$borrower_genders, "\\bmale\\b")
+kiva_loan1$Woman.Biz <- str_count(kiva_loan1$tags, "\\bWoman Owned Biz\\b")
+
+# if a male was involved on the loan
+kiva_loan1$M.F.loan <- ifelse(kiva_loan1$Female.count>0&kiva_loan1$Male.count>0,1,0)
+kiva_loan1$F.loan <- ifelse(kiva_loan1$Female.count>0,1,0)
+kiva_loan1$M.loan <- ifelse(kiva_loan1$Male.count>0,1,0)
 
 # detect all female, all male or female and male borrowers
 kiva_loan1$borrower_genders <- as.character(kiva_loan1$borrower_genders,fixed=TRUE)
@@ -87,8 +102,37 @@ kiva_loan.join.s <- kiva_loan1%>%dplyr::select(funded_amount,loan_amount,country
 kiva_loan.join.s1 <- distinct(kiva_loan.join.s)
 kiva_loan.join.s.d <- kiva_loan.join.s1%>%group_by(country,sector)%>%mutate(loan_amount.sector=sum(loan_amount),funded_amount.sector=sum(funded_amount))%>%group_by(country,activity)%>%mutate(loan_amount.activity=sum(loan_amount),funded_amount.activity=sum(funded_amount))
 kiva_loan1_head <- kiva_loan1[1:6,]
-kable(kiva_loan1_head,"latex",booktabs=T)
+kiva_loan1_head
+kiva_loan1
+
 ```
+
+```{r, echo=FALSE, message=FALSE,warning=FALSE}
+par(mfrow=c(2, 2))
+# total number of loan ids in dataset
+print(c(Total.Loan.Population=sum(unique(kiva_loan1$partner_id))))
+# table overall gender
+gender1<-as.data.frame(table(kiva_loan1$Gender.Var,kiva_loan1$year))
+colnames(gender1)<-c("Gender.Var","year","Frequency")
+
+ggplot(data=gender1, aes(x=Gender.Var, y=Frequency)) +
+  geom_bar(stat="identity",fill="orange")+theme(plot.title = element_text(hjust = 0.5))+ggtitle("Frequency of Overall Gender")
+
+# table of frequency of all female loans, all male loans, and male/female loan (having 1 male, having 2 male...)
+kiva_loan1
+```
+
+
+```{r, echo=FALSE, message=FALSE}
+#formula for female and male distributions
+sum(kiva_loan1$Female.count)/(sum(kiva_loan1$Male.count)+sum(kiva_loan1$Female.count))
+sum(kiva_loan1$M.F.loan) # of loans with males on a female loan
+sum(kiva_loan1$M.F.loan)/sum(kiva_loan1$F.loan) # of loans with female
+
+sum(kiva_loan1$Woman.Biz)
+
+```
+
 
 ```{r, echo=FALSE, message=FALSE}
 library(data.table)
