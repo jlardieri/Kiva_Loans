@@ -9,6 +9,9 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+
+![Data Science for Social Good.](image.png)
+
 ##Abstract
 My interest is in the social sciences, and the use of data science for social good. From improving global health to city infrastructure, we can use data to help solve major societal issues. In my career, I'd like to contribute to these efforts.
 
@@ -47,15 +50,21 @@ how effective are loans? repeat borrowers, type of loan (6 type of loans given)
 #Dataset 1: Kiva loan
 The dataset contains the majority of the loan detail. 
 ```{r, echo=FALSE, message=FALSE,warning=FALSE}
+library(plyr)
 library(dplyr)
 library(tidyr)
 library(arm)
+library(stats)
 library(DT)
 library(gridExtra)
 library(kableExtra)
 library(stringr)
 library(knitr)
 library(ggplot2)
+library(data.table)
+library(gtools)
+library(ggplot2)
+library(grid)
 # read kiva data
 df<-read.csv("kiva_loans.csv",na.strings = c("","NA"))
 #length(unique(df$id)) 671,205 loans
@@ -95,8 +104,8 @@ kiva_loan1$borrower_genders <- as.character(kiva_loan1$borrower_genders,fixed=TR
 kiva_loan1$borrower_genders <- gsub(" ","",kiva_loan1$borrower_genders)
 kiva_loan1$Gender <- sapply(strsplit(kiva_loan1$borrower_genders, ",",fixed = TRUE), function(x)paste(unique(x),collapse=","))
 
-# add variable if just female (1), just male (0), or female and male (3)
-kiva_loan1 <- kiva_loan1%>%mutate(Gender.Var=ifelse(Gender=="female",0,ifelse(Gender=="male",1,ifelse(Gender=="female,male",3,3))))
+# add variable if just female (0), just male (1), or female and male (2)
+kiva_loan1 <- kiva_loan1%>%mutate(Gender.Var=ifelse(Gender=="female",1,ifelse(Gender=="male",2,ifelse(Gender=="female,male",3,3))))
 
 # add variable for "water" from use
 kiva_loan1$Water <- as.integer(grepl(pattern="water",x=kiva_loan1$use))
@@ -105,19 +114,19 @@ kiva_loan1$Water <- as.integer(grepl(pattern="water",x=kiva_loan1$use))
 #data to join with MPI
 kiva_loan.join <- kiva_loan1%>%dplyr::select(loan_amount,funded_amount,country)%>%group_by(country)%>%summarise(sumloan_amount=sum(loan_amount),sumfunded_amount=sum(funded_amount))
 kiva_loan.join.d <- distinct(kiva_loan.join)
-
+kiva_loan
 # to join sector and activity with world_region
 kiva_loan.join.s <- kiva_loan1%>%dplyr::select(funded_amount,loan_amount,country,sector,activity)
 kiva_loan.join.s1 <- distinct(kiva_loan.join.s)
 kiva_loan.join.s.d <- kiva_loan.join.s1%>%group_by(country,sector)%>%mutate(loan_amount.sector=sum(loan_amount),funded_amount.sector=sum(funded_amount))%>%group_by(country,activity)%>%mutate(loan_amount.activity=sum(loan_amount),funded_amount.activity=sum(funded_amount))
-kiva_loan1_head <- kiva_loan1[1:6,]
-kiva_loan1_head
-kiva_loan1
+kable_kiva <- kiva_loan1%>%dplyr::select(partner_id, funded_amount,loan_amount,sector, activity,use,tags, country,region,borrower_genders,date)
+kable_kiva_head <- kable_kiva[1:5,]
+kable_styling(kable(kable_kiva_head,full_width=TRUE))
 
 ```
 
-```{r, echo=FALSE, message=FALSE,warning=FALSE}
-library(plyr)
+```{r, echo=FALSE, message=FALSE,warning=FALSE,fig.height=10,fig.width=10}
+
 par(mfrow=c(2, 2))
 
 # gender loan breakdown
@@ -131,17 +140,52 @@ sprintf("Total Loans - Funded = %.0f%%",100* nrow(kiva_loan1[kiva_loan1$fully.fu
 sprintf("Female Only Loans - Funded = %.0f%%",100*(nrow(kiva_loan1[kiva_loan1$F.only.loan==1&kiva_loan1$fully.funded==1,])/nrow(kiva_loan1[kiva_loan1$F.only.loan==1,])))
 sprintf("Male Only Loans - Funded = %.0f%%",100*(nrow(kiva_loan1[kiva_loan1$M.only.loan==1&kiva_loan1$fully.funded==1,])/nrow(kiva_loan1[kiva_loan1$M.only.loan==1,])))
 sprintf("Female+Male Loans - Funded = %.0f%%",100*(nrow(kiva_loan1[kiva_loan1$M.F.loan==1&kiva_loan1$fully.funded==1,])/nrow(kiva_loan1[kiva_loan1$M.F.loan==1,])))
-# table overall gender
+# table overall gender var
+n
 
 # chart proportion visual and then breakout by country and region
+detach(package:plyr) #need to detach plyr for grouping to work
+gender1<-as.data.frame(table(kiva_loan1$Gender.Var,kiva_loan1$region))
+colnames(gender1)<-c("Gender.Var","region","Frequency")
+gender.region <- gender1%>%group_by(region)%>%mutate(freq=sum(Frequency),freq.prop=paste(Frequency/sum(Frequency)*100))
+gender.region[order(-gender.region$freq),]
 
-gender1<-as.data.frame(table(kiva_loan1$Gender.Var,kiva_loan1$year))
-colnames(gender1)<-c("Gender.Var","year","Frequency")
+gender2<-as.data.frame(table(kiva_loan1$Gender.Var,kiva_loan1$country))
+colnames(gender2)<-c("Gender.Var","country","Frequency")
+gender.country <- gender2%>%group_by(country)%>%mutate(freq=sum(Frequency),freq.prop=paste(Frequency/sum(Frequency)*100))
+gender.country[order(-gender.country$freq),]
 
-ggplot(data=gender1, aes(x=Gender.Var, y=Frequency)) +
-  geom_bar(stat="identity",fill="orange")+theme(plot.title = element_text(hjust = 0.5))+ggtitle("Frequency of Overall Gender")
+# top 10 proportions where male >50%
+gender.region$freq.prop <- as.numeric(gender.region$freq.prop)
+tbl_df(gender.region)%>%filter(Gender.Var==2&freq.prop>50) # about 2,300 regions where male prop >50%
+tbl_df(gender.region)%>%filter(Gender.Var==2&freq.prop>50)%>%top_n(10,wt=freq) # top 10 regions based on frequency
+
+gender.country$freq.prop <- as.numeric(gender.country$freq.prop)
+tbl_df(gender.country)%>%filter(Gender.Var==2&freq.prop>50) # 18 countries where male prop >50%
+tbl_df(gender.country)%>%filter(Gender.Var==2&freq.prop>50)%>%top_n(10,wt=freq) # top 10 countries based on frequency
+
+
+# top freq regions where female > 50%
+tbl_df(gender.region)%>%filter(Gender.Var==1&freq.prop>50) # almost 8,000 regions where female prop >50%
+tbl_df(gender.region)%>%filter(Gender.Var==1&freq.prop>50)%>%top_n(10,wt=freq) # top 10 regions based on frequency
+
+tbl_df(gender.country)%>%filter(Gender.Var==1&freq.prop>50) # 52 countries where female prop >50%
+tbl_df(gender.country)%>%filter(Gender.Var==1&freq.prop>50)%>%top_n(10,wt=freq) # top 10 countries based on frequency
+
+# plot top 10 proportional regions male and female
+gender.f <- gender.region%>%filter(region=="Eldoret"|region=="Kitale"|region=="Lahore"|region=="Managua"|region=="Medellín"|region=="Multan"|region=="Rawalpindi"|region=="San Gabriel"|region=="San Miguel"|region=="Thanh Hoá")
+gender.f$Gender.Var1 <- recode(gender.f$Gender.Var,"1"="Female","2"="Male","3"="Male+Female")
+gender.m <- gender.region%>%filter(region=="Baniswef"|region=="Ciudad El Triunfo"|region=="El Transito"|region=="Fort Portal"|region=="Gegharkunik region"|region=="Hoima"|region=="Kaduna"|region=="Kamwenge"|region=="Kasese"|region=="Kisii")
+gender.m$Gender.Var1 <- recode(gender.f$Gender.Var,"1"="Female","2"="Male","3"="Male+Female")
+
+#ordered by total loan frequency
+topf.plot <- ggplot(gender.f, aes(fill=Gender.Var1, y=Frequency, x=reorder(region,-Frequency)))+geom_bar(stat="identity",position="fill")+scale_fill_manual(values=c("#99CCFF","#006699","#66CC33"))+guides(fill=guide_legend(title="Gender"))+theme(text=element_text(size=19),axis.text.x=element_text(angle=30, hjust=1))+labs(title = "Highest Number of Female Loans",subtitle = "", y="",x="")+theme(plot.title = element_text(hjust=0.5))
+topm.plot<-ggplot(gender.m, aes(fill=Gender.Var1, y=Frequency, x=reorder(region,-Frequency)))+geom_bar(stat="identity",position="fill")+scale_fill_manual(values=c("#99CCFF","#006699","#66CC33"))+guides(fill=guide_legend(title="Gender"))+theme(text=element_text(size=19),axis.text.x=element_text(angle=30, hjust=1))+labs(title = "Highest Number of Male Loans", subtitle = "", y="",x="")+theme(plot.title = element_text(hjust=0.5))
+
+grid.arrange(topf.plot,topm.plot, nrow=2, bottom="Region",left="Frequency", top=textGrob("",gp=gpar(fontsize=15,font=10)))
 
 ```
+
 
 
 ```{r, echo=FALSE, message=FALSE}
@@ -152,8 +196,7 @@ sum(kiva_loan1$Woman.Biz)
 
 
 ```{r, echo=FALSE, message=FALSE}
-library(data.table)
-library(gtools)
+
 # read loan theme by region
 df1<-read.csv("loan_themes_by_region.csv",na.strings = c("","NA"))
 #head(df1)
@@ -209,8 +252,7 @@ mpi.world_region.d3 <-distinct(mpi.world_region.d2)
 #Distribution of Fully Funded, Partially Funded, and Unfunded Loans
 ```{r,echo=FALSE,message=FALSE}
 par(mfrow=c(3,3))
-library(ggplot2)
-library(grid)
+
 # only funded loans where funded_amount is greater than 0
 funded <- kiva_loan1%>%filter(funded_amount==loan_amount)%>%dplyr::select(country,funded_amount)
 # log transform
