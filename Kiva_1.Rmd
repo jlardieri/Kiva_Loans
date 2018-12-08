@@ -55,12 +55,14 @@ library(gridExtra)
 library(kableExtra)
 library(stringr)
 library(knitr)
+library(ggplot2)
 # read kiva data
 df<-read.csv("kiva_loans.csv",na.strings = c("","NA"))
-kiva_loan
-# separate tags (for example, "Elderly, Woman Owned Biz") and remove # from text
-kiva_loan <- df%>%mutate(tags=strsplit(as.character(tags),","))%>%unnest(tags)
-kiva_loan$tags <- gsub("#","",kiva_loan$tags, fixed=TRUE)
+#length(unique(df$id)) 671,205 loans
+kiva_loan <- df
+# kiva_loan.tags separates tags (for example, "Elderly, Woman Owned Biz") and remove # from text
+kiva_loan.tags <- df%>%mutate(tags=strsplit(as.character(tags),","))%>%unnest(tags)
+kiva_loan.tags$tags <- gsub("#","",kiva_loan.tags$tags, fixed=TRUE)
 
 # date conversion and add month and year as columns
 kiva_loan$date <- as.Date(kiva_loan$date , "%Y-%m-%d")
@@ -76,10 +78,17 @@ kiva_loan1$Female.count <- str_count(kiva_loan1$borrower_genders, "\\bfemale\\b"
 kiva_loan1$Male.count <- str_count(kiva_loan1$borrower_genders, "\\bmale\\b")
 kiva_loan1$Woman.Biz <- str_count(kiva_loan1$tags, "\\bWoman Owned Biz\\b")
 
-# if a male was involved on the loan
+# if a male was involved on the loan, female on loan, male on loan, female only loan
 kiva_loan1$M.F.loan <- ifelse(kiva_loan1$Female.count>0&kiva_loan1$Male.count>0,1,0)
 kiva_loan1$F.loan <- ifelse(kiva_loan1$Female.count>0,1,0)
 kiva_loan1$M.loan <- ifelse(kiva_loan1$Male.count>0,1,0)
+kiva_loan1$F.only.loan <- ifelse(kiva_loan1$Female.count>0&kiva_loan1$Male.count==0,1,0)
+kiva_loan1$M.only.loan <- ifelse(kiva_loan1$Male.count>0&kiva_loan1$Female.count==0,1,0)
+
+# funded, unfunded, partially funded
+kiva_loan1$fully.funded <- ifelse(kiva_loan1$loan_amount==kiva_loan1$funded_amount,1,0)
+kiva_loan1$unfunded <- ifelse(kiva_loan1$funded_amount==0,1,0)
+kiva_loan1$partial.funded <- ifelse(kiva_loan1$funded_amount<kiva_loan1$loan_amount,1,0)
 
 # detect all female, all male or female and male borrowers
 kiva_loan1$borrower_genders <- as.character(kiva_loan1$borrower_genders,fixed=TRUE)
@@ -108,26 +117,34 @@ kiva_loan1
 ```
 
 ```{r, echo=FALSE, message=FALSE,warning=FALSE}
+library(plyr)
 par(mfrow=c(2, 2))
-# total number of loan ids in dataset
-print(c(Total.Loan.Population=sum(unique(kiva_loan1$partner_id))))
+
+# gender loan breakdown
+sprintf("No. of Total Loans = %s", nrow(kiva_loan1[kiva_loan1$partner_id,]))
+sprintf("Female Only Loans = %.0f%%",100*(nrow(kiva_loan1[kiva_loan1$F.only.loan==1,])/nrow(kiva_loan1[kiva_loan1$partner_id,])))
+sprintf("Male Only Loans = %.0f%%",100*(nrow(kiva_loan1[kiva_loan1$M.only.loan==1,])/nrow(kiva_loan1[kiva_loan1$partner_id,])))
+sprintf("Female+Male Loans = %.0f%%",100*(nrow(kiva_loan1[kiva_loan1$M.F.loan==1,])/nrow(kiva_loan1[kiva_loan1$partner_id,])))
+
+# gender + funded status breakdown
+sprintf("Total Loans - Funded = %.0f%%",100* nrow(kiva_loan1[kiva_loan1$fully.funded==1,])/nrow(kiva_loan1[kiva_loan1$partner_id,]))
+sprintf("Female Only Loans - Funded = %.0f%%",100*(nrow(kiva_loan1[kiva_loan1$F.only.loan==1&kiva_loan1$fully.funded==1,])/nrow(kiva_loan1[kiva_loan1$F.only.loan==1,])))
+sprintf("Male Only Loans - Funded = %.0f%%",100*(nrow(kiva_loan1[kiva_loan1$M.only.loan==1&kiva_loan1$fully.funded==1,])/nrow(kiva_loan1[kiva_loan1$M.only.loan==1,])))
+sprintf("Female+Male Loans - Funded = %.0f%%",100*(nrow(kiva_loan1[kiva_loan1$M.F.loan==1&kiva_loan1$fully.funded==1,])/nrow(kiva_loan1[kiva_loan1$M.F.loan==1,])))
 # table overall gender
+
+# chart proportion visual and then breakout by country and region
+
 gender1<-as.data.frame(table(kiva_loan1$Gender.Var,kiva_loan1$year))
 colnames(gender1)<-c("Gender.Var","year","Frequency")
 
 ggplot(data=gender1, aes(x=Gender.Var, y=Frequency)) +
   geom_bar(stat="identity",fill="orange")+theme(plot.title = element_text(hjust = 0.5))+ggtitle("Frequency of Overall Gender")
 
-# table of frequency of all female loans, all male loans, and male/female loan (having 1 male, having 2 male...)
-kiva_loan1
 ```
 
 
 ```{r, echo=FALSE, message=FALSE}
-#formula for female and male distributions
-sum(kiva_loan1$Female.count)/(sum(kiva_loan1$Male.count)+sum(kiva_loan1$Female.count))
-sum(kiva_loan1$M.F.loan) # of loans with males on a female loan
-sum(kiva_loan1$M.F.loan)/sum(kiva_loan1$F.loan) # of loans with female
 
 sum(kiva_loan1$Woman.Biz)
 
