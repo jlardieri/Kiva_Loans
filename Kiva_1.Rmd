@@ -1,5 +1,5 @@
 ---
-title: "Lardieri Midterm Project - Kiva Loans"
+title: "Lardieri Applied Statistical Modeling Midterm Project - Kiva Loans"
 output:
   html_document: default
   pdf_document: default
@@ -8,93 +8,87 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+pacman::p_load(
+"plyr",
+"dplyr",
+"tidyr",
+"arm",
+"stats",
+"DT",
+"gridExtra",
+"kableExtra",
+"stringr",
+"knitr",
+"ggplot2",
+"data.table",
+"gtools",
+"ggplot2",
+"grid",
+"treemapify",
+"treemap",
+"RColorBrewer",
+"functional"
+)
+  
 ```
 
-![Data Science for Social Good.](image.png)
+![Data Science for Social Good.](image.jpg)
 
 ##Abstract
 My interest is in the social sciences, and the use of data science for social good. From improving global health to city infrastructure, we can use data to help solve major societal issues. In my career, I'd like to contribute to these efforts.
 
-I chose my project because it aligns with my goal of working with data for social good. I will see whether loans are su
- 
-Kiva.org is an international nonprofit whose mission is to connect people through lending to help alleviate poverty. Kiva supports 3 million borrowers in more than 80 countries, empowering people to create opportunities for themselves, their families, and their communities. My project aims to take a deeper look at the Kiva data, to see if there are any underlying themes or behaviors that differ between regions and countries. Specifically, is there variation in category and amount of funding and to whom. 
-- Most imporverished areas
-- What is being funded/partially funded/not funded and likelihood?
-- Female vs. male borrowers and whether having a male in the group affects loan behavior?
-- Repeat and type of borrowers
+I chose my project because it aligns with this goal. I'm interested in Kiva.org's cause because they empower so many individuals and communities around the world through crowdsourced loans, not donations. Anyone can go to the website, get familiar with someone's story and make a loan contribution. 
 
-EDA plot outcome on number of F and number of male and ratio of male count to female count to inform us whether count and proportion make sense. 
-Does a male impact on the loan. 
-Number of females might not matter, but once adding in a male that could affect the loan amount.
-Linear regression model per country on amount of loan for gender
+![Kiva.org.](kiva.png)
+
+Their website has a number of focus areas; women, single parents, conflict zones, water, and education to name a few. As a nonprofit, Kiva's mission is to connect people through lending to help alleviate poverty. Kiva supports 3 million borrowers in more than 80 countries, creating opportunities for individuals, their families, and their communities. 
+
+My project aims to take a deeper look at the Kiva loan data, to see if there are any underlying themes or behaviors that differ between regions and countries. Specifically, is there variation in category and amount of funding and to whom. 
+
 Multilevel model consider country as random effect and gender as random slope (if gender does in fact make a difference on amount from EDA)
 
 ##Method
-My dataset is sourced and merged from 2 Kaggle datasets; Kiva loan detail and multidimenisonal poverty index (MPI) detail. 
+The dataset is sourced and merged from 2 Kaggle datasets; loan detail from Kiva.org and regional multidimenisonal poverty index (MPI) detail. It was reshaped to have tag information per row (tags are additional information provided for borrowers, for example, "Elderly","Woman Owned Biz"). 
 
-Note that there is more data to be merged that will be relevant to analysis, loan theme by region, human development index, and population below the poverty line.
+Variables $Partner.ID, Country, Region, World Region, Sector, Activity, Use, Tags, Gender, Tags, Date, Funded Loan Amount, Loan Amount, MPI$
 
-Variables $Year, Country, World Region, Sector, Activity, Gender, Type of Borrower, Funded Loan Amount, MPI$
-
-##Conclusion
-TBD
-Response
-term of loan
-funded or not funded
-funded, partially funded, or not funded
-female vs male probability of getting funded
-type of loan probability of getting funded
-
-how effective are loans? repeat borrowers, type of loan (6 type of loans given)
-
-#Dataset 1: Kiva loan
-The dataset contains the majority of the loan detail. 
+Note that there is more data to be merged that will be relevant to analysis, loan theme by region, human development index, and population below the poverty line in the future. 
+#Dataset 1: Kiva Loans
+The dataset contains the majority of the loan detail provided by Kiva. 
 ```{r, echo=FALSE, message=FALSE,warning=FALSE}
-library(plyr)
-library(dplyr)
-library(tidyr)
-library(arm)
-library(stats)
-library(DT)
-library(gridExtra)
-library(kableExtra)
-library(stringr)
-library(knitr)
-library(ggplot2)
-library(data.table)
-library(gtools)
-library(ggplot2)
-library(grid)
 # read kiva data
 df<-read.csv("kiva_loans.csv",na.strings = c("","NA"))
+
 #length(unique(df$id)) 671,205 loans
 kiva_loan <- df
-# kiva_loan.tags separates tags (for example, "Elderly, Woman Owned Biz") and remove # from text
+
+# Reshape: kiva_loan.tags separates tags (for example, "Elderly, Woman Owned Biz") and remove # from text
 kiva_loan.tags <- df%>%mutate(tags=strsplit(as.character(tags),","))%>%unnest(tags)
 kiva_loan.tags$tags <- gsub("#","",kiva_loan.tags$tags, fixed=TRUE)
 
-# date conversion and add month and year as columns
+# Add variable: date conversion and add month + year
 kiva_loan$date <- as.Date(kiva_loan$date , "%Y-%m-%d")
 kiva_loan <- kiva_loan%>%mutate(month=format(date, "%m"), year=format(date,"%Y"))
+
 # sort by id
 kiva_loan <- kiva_loan[order(kiva_loan$id),]
 
 # select specific columns
 kiva_loan1 <- kiva_loan%>%dplyr::select(partner_id, funded_amount,loan_amount,sector,activity,country,region,borrower_genders,use, term_in_months,date,month,year,tags)%>%na.omit()
 
-# count number of female / male per loan
+# Add variables: count number of female / male per loan
 kiva_loan1$Female.count <- str_count(kiva_loan1$borrower_genders, "\\bfemale\\b")
 kiva_loan1$Male.count <- str_count(kiva_loan1$borrower_genders, "\\bmale\\b")
 kiva_loan1$Woman.Biz <- str_count(kiva_loan1$tags, "\\bWoman Owned Biz\\b")
 
-# if a male was involved on the loan, female on loan, male on loan, female only loan
+# Add Variables: male+female loans, female loans, female only loans, male loans, male only loans
 kiva_loan1$M.F.loan <- ifelse(kiva_loan1$Female.count>0&kiva_loan1$Male.count>0,1,0)
 kiva_loan1$F.loan <- ifelse(kiva_loan1$Female.count>0,1,0)
 kiva_loan1$M.loan <- ifelse(kiva_loan1$Male.count>0,1,0)
 kiva_loan1$F.only.loan <- ifelse(kiva_loan1$Female.count>0&kiva_loan1$Male.count==0,1,0)
 kiva_loan1$M.only.loan <- ifelse(kiva_loan1$Male.count>0&kiva_loan1$Female.count==0,1,0)
 
-# funded, unfunded, partially funded
+# Add Variables: funded, unfunded, partially funded
 kiva_loan1$fully.funded <- ifelse(kiva_loan1$loan_amount==kiva_loan1$funded_amount,1,0)
 kiva_loan1$unfunded <- ifelse(kiva_loan1$funded_amount==0,1,0)
 kiva_loan1$partial.funded <- ifelse(kiva_loan1$funded_amount<kiva_loan1$loan_amount,1,0)
@@ -103,18 +97,16 @@ kiva_loan1$partial.funded <- ifelse(kiva_loan1$funded_amount<kiva_loan1$loan_amo
 kiva_loan1$borrower_genders <- as.character(kiva_loan1$borrower_genders,fixed=TRUE)
 kiva_loan1$borrower_genders <- gsub(" ","",kiva_loan1$borrower_genders)
 kiva_loan1$Gender <- sapply(strsplit(kiva_loan1$borrower_genders, ",",fixed = TRUE), function(x)paste(unique(x),collapse=","))
-
-# add variable if just female (0), just male (1), or female and male (2)
 kiva_loan1 <- kiva_loan1%>%mutate(Gender.Var=ifelse(Gender=="female",1,ifelse(Gender=="male",2,ifelse(Gender=="female,male",3,3))))
 
-# add variable for "water" from use
+# Add Variable: for "water" from use (may look at this)
 kiva_loan1$Water <- as.integer(grepl(pattern="water",x=kiva_loan1$use))
 #datatable(head(kiva_loan1,5),class="table-condensed",style="bootstrap")
 
-#data to join with MPI
+#data to join with MPI dataset 2
 kiva_loan.join <- kiva_loan1%>%dplyr::select(loan_amount,funded_amount,country)%>%group_by(country)%>%summarise(sumloan_amount=sum(loan_amount),sumfunded_amount=sum(funded_amount))
 kiva_loan.join.d <- distinct(kiva_loan.join)
-kiva_loan
+
 # to join sector and activity with world_region
 kiva_loan.join.s <- kiva_loan1%>%dplyr::select(funded_amount,loan_amount,country,sector,activity)
 kiva_loan.join.s1 <- distinct(kiva_loan.join.s)
@@ -122,114 +114,38 @@ kiva_loan.join.s.d <- kiva_loan.join.s1%>%group_by(country,sector)%>%mutate(loan
 kable_kiva <- kiva_loan1%>%dplyr::select(partner_id, funded_amount,loan_amount,sector, activity,use,tags, country,region,borrower_genders,date)
 kable_kiva_head <- kable_kiva[1:5,]
 kable_styling(kable(kable_kiva_head,full_width=TRUE))
-
 ```
 
-```{r, echo=FALSE, message=FALSE,warning=FALSE,fig.height=10,fig.width=10}
-
-par(mfrow=c(2, 2))
-
-# gender loan breakdown
-sprintf("No. of Total Loans = %s", nrow(kiva_loan1[kiva_loan1$partner_id,]))
-sprintf("Female Only Loans = %.0f%%",100*(nrow(kiva_loan1[kiva_loan1$F.only.loan==1,])/nrow(kiva_loan1[kiva_loan1$partner_id,])))
-sprintf("Male Only Loans = %.0f%%",100*(nrow(kiva_loan1[kiva_loan1$M.only.loan==1,])/nrow(kiva_loan1[kiva_loan1$partner_id,])))
-sprintf("Female+Male Loans = %.0f%%",100*(nrow(kiva_loan1[kiva_loan1$M.F.loan==1,])/nrow(kiva_loan1[kiva_loan1$partner_id,])))
-
-# gender + funded status breakdown
-sprintf("Total Loans - Funded = %.0f%%",100* nrow(kiva_loan1[kiva_loan1$fully.funded==1,])/nrow(kiva_loan1[kiva_loan1$partner_id,]))
-sprintf("Female Only Loans - Funded = %.0f%%",100*(nrow(kiva_loan1[kiva_loan1$F.only.loan==1&kiva_loan1$fully.funded==1,])/nrow(kiva_loan1[kiva_loan1$F.only.loan==1,])))
-sprintf("Male Only Loans - Funded = %.0f%%",100*(nrow(kiva_loan1[kiva_loan1$M.only.loan==1&kiva_loan1$fully.funded==1,])/nrow(kiva_loan1[kiva_loan1$M.only.loan==1,])))
-sprintf("Female+Male Loans - Funded = %.0f%%",100*(nrow(kiva_loan1[kiva_loan1$M.F.loan==1&kiva_loan1$fully.funded==1,])/nrow(kiva_loan1[kiva_loan1$M.F.loan==1,])))
-# table overall gender var
-n
-
-# chart proportion visual and then breakout by country and region
-detach(package:plyr) #need to detach plyr for grouping to work
-gender1<-as.data.frame(table(kiva_loan1$Gender.Var,kiva_loan1$region))
-colnames(gender1)<-c("Gender.Var","region","Frequency")
-gender.region <- gender1%>%group_by(region)%>%mutate(freq=sum(Frequency),freq.prop=paste(Frequency/sum(Frequency)*100))
-gender.region[order(-gender.region$freq),]
-
-gender2<-as.data.frame(table(kiva_loan1$Gender.Var,kiva_loan1$country))
-colnames(gender2)<-c("Gender.Var","country","Frequency")
-gender.country <- gender2%>%group_by(country)%>%mutate(freq=sum(Frequency),freq.prop=paste(Frequency/sum(Frequency)*100))
-gender.country[order(-gender.country$freq),]
-
-# top 10 proportions where male >50%
-gender.region$freq.prop <- as.numeric(gender.region$freq.prop)
-tbl_df(gender.region)%>%filter(Gender.Var==2&freq.prop>50) # about 2,300 regions where male prop >50%
-tbl_df(gender.region)%>%filter(Gender.Var==2&freq.prop>50)%>%top_n(10,wt=freq) # top 10 regions based on frequency
-
-gender.country$freq.prop <- as.numeric(gender.country$freq.prop)
-tbl_df(gender.country)%>%filter(Gender.Var==2&freq.prop>50) # 18 countries where male prop >50%
-tbl_df(gender.country)%>%filter(Gender.Var==2&freq.prop>50)%>%top_n(10,wt=freq) # top 10 countries based on frequency
-
-
-# top freq regions where female > 50%
-tbl_df(gender.region)%>%filter(Gender.Var==1&freq.prop>50) # almost 8,000 regions where female prop >50%
-tbl_df(gender.region)%>%filter(Gender.Var==1&freq.prop>50)%>%top_n(10,wt=freq) # top 10 regions based on frequency
-
-tbl_df(gender.country)%>%filter(Gender.Var==1&freq.prop>50) # 52 countries where female prop >50%
-tbl_df(gender.country)%>%filter(Gender.Var==1&freq.prop>50)%>%top_n(10,wt=freq) # top 10 countries based on frequency
-
-# plot top 10 proportional regions male and female
-gender.f <- gender.region%>%filter(region=="Eldoret"|region=="Kitale"|region=="Lahore"|region=="Managua"|region=="Medellín"|region=="Multan"|region=="Rawalpindi"|region=="San Gabriel"|region=="San Miguel"|region=="Thanh Hoá")
-gender.f$Gender.Var1 <- recode(gender.f$Gender.Var,"1"="Female","2"="Male","3"="Male+Female")
-gender.m <- gender.region%>%filter(region=="Baniswef"|region=="Ciudad El Triunfo"|region=="El Transito"|region=="Fort Portal"|region=="Gegharkunik region"|region=="Hoima"|region=="Kaduna"|region=="Kamwenge"|region=="Kasese"|region=="Kisii")
-gender.m$Gender.Var1 <- recode(gender.f$Gender.Var,"1"="Female","2"="Male","3"="Male+Female")
-
-#ordered by total loan frequency
-topf.plot <- ggplot(gender.f, aes(fill=Gender.Var1, y=Frequency, x=reorder(region,-Frequency)))+geom_bar(stat="identity",position="fill")+scale_fill_manual(values=c("#99CCFF","#006699","#66CC33"))+guides(fill=guide_legend(title="Gender"))+theme(text=element_text(size=19),axis.text.x=element_text(angle=30, hjust=1))+labs(title = "Highest Number of Female Loans",subtitle = "", y="",x="")+theme(plot.title = element_text(hjust=0.5))
-topm.plot<-ggplot(gender.m, aes(fill=Gender.Var1, y=Frequency, x=reorder(region,-Frequency)))+geom_bar(stat="identity",position="fill")+scale_fill_manual(values=c("#99CCFF","#006699","#66CC33"))+guides(fill=guide_legend(title="Gender"))+theme(text=element_text(size=19),axis.text.x=element_text(angle=30, hjust=1))+labs(title = "Highest Number of Male Loans", subtitle = "", y="",x="")+theme(plot.title = element_text(hjust=0.5))
-
-grid.arrange(topf.plot,topm.plot, nrow=2, bottom="Region",left="Frequency", top=textGrob("",gp=gpar(fontsize=15,font=10)))
-
-```
-
-
-
-```{r, echo=FALSE, message=FALSE}
-
-sum(kiva_loan1$Woman.Biz)
-
-```
-
-
-```{r, echo=FALSE, message=FALSE}
-
-# read loan theme by region
-df1<-read.csv("loan_themes_by_region.csv",na.strings = c("","NA"))
-#head(df1)
-# fix Partner.ID to id
-setnames(df1, "Partner.ID","partner_id")
-# unselect geo, lat, lon etc and omit na
-df2 <- df1%>%dplyr::select(partner_id,country, rural_pct,sector,Loan.Theme.Type)%>%na.omit()
-```
-
-#Dataset 2: Multidimensional Poverty Index (MPI) and World Region detail
+#Dataset 2: Multidimensional Poverty Index (MPI) and World Region Detail
+This dataset contains World Region and MPI variables. 
 ```{r,echo=FALSE,message=FALSE}
 # read poverty index for region
 mpi <- read.csv("kiva_mpi_region_locations.csv", na.strings=c("","NA"))
+
 # select specific columns
-mpi1 <- mpi%>%dplyr::select(country,region,world_region,MPI)%>%na.omit()
+mpi1 <- mpi%>%dplyr::select(country,region,world_region,MPI)%>%na.omit() #mpi also has lat and lon data, would be interesting to create a map
 world.region <- mpi%>%dplyr::select(country,region,world_region)%>%na.omit()
-#datatable(head(mpi,5),class="table-condensed",style="bootstrap")
+kable_worldr_head <- mpi1[1:5,]
+kable_styling(kable(kable_worldr_head,full_width=TRUE))
 ```
 
+
+##Datasets Merged
+This is one iteration of the dataset. I summarized loans and MPI separately by world region, region, and country for analysis. 
 ```{r,echo=FALSE, message=FALSE,warning=FALSE}
 #join by country and omit nas (Country + Region + World Region + MPI + Loan by Country)
 mpi.loan.join <- mpi1%>%left_join(kiva_loan.join.d,by="country")%>%na.omit()
-
-#grouped by country and sector for loan information (World Region + sector + activity + loan by sector + loan by activity)
-mpi.loan.join.s <- world.region%>%left_join(kiva_loan.join.s.d,by="country")%>%na.omit()
-mpi.loan.join.s1 <- mpi.loan.join.s%>%dplyr::select(country,world_region,sector,activity,loan_amount.sector,loan_amount.activity,funded_amount.sector,funded_amount.activity)
-mpi.loan.join.s.d <- distinct(mpi.loan.join.s1)
 
 #convert loan amount into millions
 mpi.loan.join$sumloan_amount <-format(mpi.loan.join$sumloan_amount/1e6,digits=2)
 mpi.loan.join$sumfunded_amount <-format(mpi.loan.join$sumfunded_amount/1e6,digits=2)
 mpi.loan.join$sumloan_amount<- as.numeric(mpi.loan.join$sumloan_amount)
 mpi.loan.join$sumfunded_amount<- as.numeric(mpi.loan.join$sumfunded_amount)
+
+#grouped by country and sector for loan information (World Region + sector + activity + loan by sector + loan by activity)
+mpi.loan.join.s <- world.region%>%left_join(kiva_loan.join.s.d,by="country")%>%na.omit()
+mpi.loan.join.s1 <- mpi.loan.join.s%>%dplyr::select(country,world_region,sector,activity,loan_amount.sector,loan_amount.activity,funded_amount.sector,funded_amount.activity)
+mpi.loan.join.s.d <- distinct(mpi.loan.join.s1)
 
 # summarize loan and MPI by country
 mpi.loan.join1 <- mpi.loan.join%>%group_by(country)%>%mutate(MPI_country=mean(MPI))
@@ -247,25 +163,36 @@ mpi.world_region.d1 <- mpi.world_region.d%>%group_by(world_region)%>%mutate(suml
 mpi.world_region.d2 <- mpi.world_region.d1%>%dplyr::select(world_region,sumloan_amount.region,sumfunded_amount.region,MPI_region)
 mpi.world_region.d3 <-distinct(mpi.world_region.d2)
 
+kable_merge_head <- mpi.country.join.d[1:5,]
+kable_styling(kable(kable_merge_head,full_width=TRUE))
 ```
 
-#Distribution of Fully Funded, Partially Funded, and Unfunded Loans
-```{r,echo=FALSE,message=FALSE}
-par(mfrow=c(3,3))
+```{r, echo=FALSE, message=FALSE}
+# this is dataset 3 will want to incorporate this later
+# read loan theme by region
+#df1<-read.csv("loan_themes_by_region.csv",na.strings = c("","NA"))
+#head(df1)
+# fix Partner.ID to id
+#setnames(df1, "Partner.ID","partner_id")
+# unselect geo, lat, lon etc and omit na
+#df2 <- df1%>%dplyr::select(partner_id,country, rural_pct,sector,Loan.Theme.Type)%>%na.omit()
+```
 
-# only funded loans where funded_amount is greater than 0
-funded <- kiva_loan1%>%filter(funded_amount==loan_amount)%>%dplyr::select(country,funded_amount)
-# log transform
-funded$log.funded <- log(funded$funded_amount)
+#The Loans: Distribution of Fully Funded, Partially Funded, and Unfunded Loans
+Not all loans receive full funding. 
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+#fully funded loans
+sprintf("No. of Fully Funded Loans = %s", nrow(kiva_loan1[kiva_loan1$funded_amount==kiva_loan1$loan_amount,]))
 # unfunded loans
-unfunded <- kiva_loan1%>%filter(funded_amount==0)
-# log transform
-unfunded$log.funded <- log(unfunded$loan_amount)
-partial <- kiva_loan1%>%filter(funded_amount<loan_amount)
-# log transform
-partial$log.funded <- log(partial$funded_amount)
+sprintf("No. of Unfunded Loans = %s", nrow(kiva_loan1[kiva_loan1$funded_amount==0,]))
+# partially funded 
+sprintf("No. of Partially Funded Loans = %s", nrow(kiva_loan1[kiva_loan1$funded_amount<kiva_loan1$loan_amount&kiva_loan1$funded_amount!=0,]))
+# overfunded 
+sprintf("No. of Over Funded Loans = %s", nrow(kiva_loan1[kiva_loan1$funded_amount>kiva_loan1$loan_amount,]))
 
-print(c(Unfunded_Amount=count(unfunded),Partial_Amount=count(partial),Funded_Amount=count(funded)))
+# log transform
+funded <- kiva_loan1
+funded$log.funded <- log(funded$funded_amount)
 
 ggplot(data=funded, aes(x=log.funded))+geom_histogram(col="black",fill="seagreen3")+theme(plot.title=element_text(hjust =0.5,size=19))+labs(title = "Distribution of Fully Funded Loans (Log Scale)", y="Count",x="exp(Loan Amount)")+scale_x_continuous(breaks=c(3,5,7,11), labels=c(format(exp(3),digits=3),format(exp(5),digits=3),format(exp(7),digits=3),format(exp(11),digits=3)))
 
@@ -274,16 +201,14 @@ ggplot(data=funded, aes(x=log.funded))+geom_histogram(col="black",fill="seagreen
 #d.partial <- ggplot(data=partial, aes(x=log.funded))+geom_histogram(col="black",fill="seagreen3")+theme(plot.title=element_text(hjust =0.5,size=19))+labs(title = "Distribution of Partially Funded Loans (Log Scale)", y="Count",x="exp(Loan Amount)")+scale_x_continuous(breaks=c(3,5,7,11), labels=c(format(exp(3),digits=3),format(exp(5),digits=3),format(exp(7),digits=3),format(exp(11),digits=3)))
 ```
 
-In the dataset, there were 5,199 unfunded loans (funded amount is $0), 124,555 partially funded loans (funded amount is less than loan amount), and 1,342,420 fully funded loans. Over 91% of Kiva loans are fully funded.
+In the dataset, an unfunded loan is funded amount=$0, a partially funded loan is funded amount<loan amount and fully funded loan is funded amount=loan amount. Over 91% of Kiva loans are fully funded!
 
 From the histogram, the fully funded amounts in the dataset range from about 20 USD to about 5,9875 USD with an average of about 1,100 USD. 
 
-What is the breakdown of funded loans by Country and Region? 
+How does this breakdown by Country and Region? Is funding going to the most impoverished areas? What about gender? And sector?
 
 #Frequently Funded Countries and Regions
 ```{r, echo=FALSE,fig.height=8, fig.width=8, message=FALSE}
-library(ggplot2)
-library(wesanderson)
 par(mfrow=c(2,2))
 
 # countries with fully funded loans only
@@ -320,32 +245,42 @@ grid.arrange(p.k1,p.k2,p.k3,p.k4, nrow=2, bottom="Region",left="Frequency", top=
 
 From the bar plot, there is a mix of top regions that are top funded per year. 
 
-Is there a relationship between where the loans are funded and the poverty index of those locations - are the countries and regions who need the funding the most receiving it?
+Is there a relationship between frequently funded regions/countries and MPI?
 
-#Relationship of Funded Loan Amount and Poverty Index (MPI)
-```{r, echo=FALSE, fig.height=5,fig.width=12,message=FALSE,warning=FALSE}
-par(mfrow=c(2,2))
-library(treemapify)
-library(treemap)
-library(RColorBrewer)
-library(gridExtra)
+#Funded Loan Amount and Poverty Index (MPI)
+Here we introduce MPI and the 6 World Regions. This includes only regions and countries with an MPI. 
+```{r, echo=FALSE, fig.height=7,fig.width=12,message=FALSE,warning=FALSE}
+# show distribution of MPI
+sprintf("Max MPI = %.2f", max(mpi$MPI,na.rm=TRUE))
+sprintf("Min MPI = %.2f", min(mpi$MPI,na.rm=TRUE))
+sprintf("Med MPI = %.2f", median(mpi$MPI,na.rm=TRUE))
+sprintf("Mean MPI = %.2f", mean(mpi$MPI,na.rm=TRUE))
 
-#mean.region1$meanLoanWorldRegion<- round(mean.region1$meanLoanWorldRegion)
-mpi.world_region.d3$label <- paste(mpi.world_region.d3$world_region, mpi.world_region.d3$sumfunded_amount.region, sep=", ")
-
-#size is total loan
-treemap(mpi.world_region.d3, index="label",vSize="sumfunded_amount.region",vColor="MPI_region",title="Loans by World Region (Total in $M)",title.legend = "Region MPI (mean)", type="value",range=c(0.30,0.05),position.legend= "right", palette=brewer.pal(n=5,"RdYlGn"))
-
-#t2 <- ggplot(mean.region1, aes(area=meanLoanWorldRegion,fill=meanMPI,label=label,meanLoanWorldRegion))+geom_treemap()+geom_treemap_text(fontface="italic",color="white",placec="center",grow=TRUE)
+ggplot(data=mpi, aes(x=MPI))+geom_histogram(aes(fill=world_region))+theme(plot.title=element_text(hjust =0.5,size=19))+labs(title = "Distribution of Multidimenisonal Poverty Index (MPI)", y="Count",x="MPI")+guides(fill=guide_legend(title="World Region"))
 ```
 
-From the treemap, Sub-Saharan Africa is the poorest World Region and has received a large portion of the total Kiva loans. While South Asia, high on the poverty index, receives the second smallest portion of Kiva loans. 
-
-Latin America and Caribbean are lower on the poverty index, but receive the second largest portion of Kiva loans. 
-
-Will focus on these 3 regions and dig deeper into these differences and what other factors are playing into loan distribution.
-
+From distribution, the poorest world regions are Sub-Saharan Africa and South Asia. What proportion of loans are these world regions receiving?
 ```{r, echo=FALSE, fig.height=5,fig.width=12,message=FALSE,warning=FALSE}
+par(mfrow=c(2,2))
+# region breakdown
+sprintf("No. of Total Regions = %s", length(unique(mpi[,"region"]))-1)
+sprintf("No. of Total Countries = %s", length(unique(mpi[,"country"]))-1)
+sprintf("No. of Total World Regions = %s", length(unique(mpi[,"world_region"]))-1) #counts column name 
+
+# use loan amount for label
+mpi.world_region.d3$label <- paste(mpi.world_region.d3$world_region, mpi.world_region.d3$sumfunded_amount.region, sep=", ")
+
+#size is total funded loan
+treemap(mpi.world_region.d3, index="label",vSize="sumfunded_amount.region",vColor="MPI_region",title="Loans by World Region (Total in $M)",title.legend = "Region MPI (mean)", type="value",range=c(0.30,0.05),position.legend= "right", palette=brewer.pal(n=5,"RdYlGn"))
+```
+
+As we saw from the MPI distribution, Sub-Saharan Africa is the poorest World Region. From the treemap, Sub-Saharan Africa has received a large portion of the total funded loans. While South Asia, high on the poverty index, receives the second smallest portion of funded loans. South Asia might be an area to focus on to identify loan trends. 
+
+```{r, echo=FALSE, fig.height=8,fig.width=17,message=FALSE,warning=FALSE}
+# all countries
+mpi.loan.country.region.d$label <- paste(mpi.loan.country.region.d$country, mpi.loan.country.region.d$sumfunded_amount, sep=", ")
+treemap(mpi.loan.country.region.d, index="label",vSize="sumfunded_amount",vColor="MPI_country",title="Loans by Country (Total in $M)",title.legend = "Country MPI (mean)", type="value",range=c(0.50,0.20),position.legend= "right", palette=brewer.pal(n=5,"RdYlGn"))
+
 # countries within Sub-Saharan Africa
 mpi.country.Africa <- filter(mpi.loan.country.region.d, world_region=="Sub-Saharan Africa")
 mpi.country.Africa$label <- paste(mpi.country.Africa$country, mpi.country.Africa$sumfunded_amount, sep=", ")
@@ -362,11 +297,11 @@ mpi.country.SA$label <- paste(mpi.country.SA$country, mpi.country.SA$sumfunded_a
 treemap(mpi.country.SA, index="label",vSize="sumfunded_amount",vColor="MPI_country",title="Loans by Country in South Asia (Total in $M)",title.legend = "Country MPI (mean)", type="value",range=c(0.50,0.20),position.legend= "right", palette=brewer.pal(n=5,"RdYlGn"))
 ```
 
-From these treemaps, some of the poorest countries are receiving a small portion of the total Kiva loans for the region. 
+From these treemaps, some of the poorest countries are receiving a small portion of the total Kiva loans. Can see the darker green more prominent in the lower most corner. 
 
 Burkina and South Sudan within Sub-Saharan Africa, Haiti within Latin America and Caribbean, and Afghanistan within South Asia are receiving a small portion of the funded amounts.
 
-These are areas to dive deeper into the loan trends and what is driving these differences. 
+Again, these areas of focus for loan trends and what is driving these differences. One thing to consider are potential sector and activity differences between the regions/countries. Are certain types of loans more frequent? 
 
 #Frequently Funded Sectors
 ```{r, echo=FALSE,fig.height=10, fig.width=10,message=FALSE}
@@ -408,53 +343,93 @@ grid.arrange(top.3.p1, nrow=1,left=textGrob("Proportion of Funded Loans",rot=90,
 ```
 
 The chart indicates that although Agricultural loans are the most frequently funded, they make up a smaller dollar proportion of funded loan amounts. 
-Recalling the treemap by World Region, are there similar breakdowns further by countries in Sub-Saharan Africa, Latin America and Caribbean, and South Asia?
+Recalling the treemap by World Region, are there similar breakdowns further by country?
+
+##Loan Breakdown by Gender
+Now that we have a sense for the loans
+```{r, echo=FALSE, message=FALSE,warning=FALSE,fig.height=10,fig.width=10}
+par(mfrow=c(2, 2))
+
+# gender loan breakdown
+sprintf("No. of Total Loans = %s", nrow(kiva_loan1[kiva_loan1$partner_id,]))
+sprintf("Female Only Loans = %.0f%%",100*(nrow(kiva_loan1[kiva_loan1$F.only.loan==1,])/nrow(kiva_loan1[kiva_loan1$partner_id,])))
+sprintf("Male Only Loans = %.0f%%",100*(nrow(kiva_loan1[kiva_loan1$M.only.loan==1,])/nrow(kiva_loan1[kiva_loan1$partner_id,])))
+sprintf("Female+Male Loans = %.0f%%",100*(nrow(kiva_loan1[kiva_loan1$M.F.loan==1,])/nrow(kiva_loan1[kiva_loan1$partner_id,])))
+
+# gender + funded status breakdown
+sprintf("Total Loans - Funded = %.0f%%",100* nrow(kiva_loan1[kiva_loan1$fully.funded==1,])/nrow(kiva_loan1[kiva_loan1$partner_id,]))
+sprintf("Female Only Loans - Funded = %.0f%%",100*(nrow(kiva_loan1[kiva_loan1$F.only.loan==1&kiva_loan1$fully.funded==1,])/nrow(kiva_loan1[kiva_loan1$F.only.loan==1,])))
+sprintf("Male Only Loans - Funded = %.0f%%",100*(nrow(kiva_loan1[kiva_loan1$M.only.loan==1&kiva_loan1$fully.funded==1,])/nrow(kiva_loan1[kiva_loan1$M.only.loan==1,])))
+sprintf("Female+Male Loans - Funded = %.0f%%",100*(nrow(kiva_loan1[kiva_loan1$M.F.loan==1&kiva_loan1$fully.funded==1,])/nrow(kiva_loan1[kiva_loan1$M.F.loan==1,])))
+
+# chart proportion visual and then breakout by country and region
+detach(package:plyr) #need to detach plyr for grouping to work
+gender1<-as.data.frame(table(kiva_loan1$Gender.Var,kiva_loan1$region))
+colnames(gender1)<-c("Gender.Var","region","Frequency")
+gender.region <- gender1%>%group_by(region)%>%mutate(freq=sum(Frequency),freq.prop=paste(Frequency/sum(Frequency)*100))
+gender.region <- gender.region[order(-gender.region$freq),]
+
+gender2<-as.data.frame(table(kiva_loan1$Gender.Var,kiva_loan1$country))
+colnames(gender2)<-c("Gender.Var","country","Frequency")
+gender.country <- gender2%>%group_by(country)%>%mutate(freq=sum(Frequency),freq.prop=paste(Frequency/sum(Frequency)*100))
+gender.country <- gender.country[order(-gender.country$freq),]
+# top 10 proportions where male >50%
+gender.region$freq.prop <- as.numeric(gender.region$freq.prop)
+#tbl_df(gender.region)%>%filter(Gender.Var==2&freq.prop>50) # about 2,300 regions where male prop >50%
+#tbl_df(gender.region)%>%filter(Gender.Var==2&freq.prop>50)%>%top_n(10,wt=freq) # top 10 regions based on frequency
+
+gender.country$freq.prop <- as.numeric(gender.country$freq.prop)
+#tbl_df(gender.country)%>%filter(Gender.Var==2&freq.prop>50) # 18 countries where male prop >50%
+#tbl_df(gender.country)%>%filter(Gender.Var==2&freq.prop>50)%>%top_n(10,wt=freq) # top 10 countries based on frequency
+
+# top freq regions where female > 50%
+#tbl_df(gender.region)%>%filter(Gender.Var==1&freq.prop>50) # almost 8,000 regions where female prop >50%
+#tbl_df(gender.region)%>%filter(Gender.Var==1&freq.prop>50)%>%top_n(10,wt=freq) # top 10 regions based on frequency
+
+#tbl_df(gender.country)%>%filter(Gender.Var==1&freq.prop>50) # 52 countries where female prop >50%
+#tbl_df(gender.country)%>%filter(Gender.Var==1&freq.prop>50)%>%top_n(10,wt=freq) # top 10 countries based on frequency
+
+# plot top 10 proportional regions male and female
+gender.f <- gender.region%>%filter(region=="Eldoret"|region=="Kitale"|region=="Lahore"|region=="Managua"|region=="Medellín"|region=="Multan"|region=="Rawalpindi"|region=="San Gabriel"|region=="San Miguel"|region=="Thanh Hoá")
+gender.f$Gender.Var1 <- recode(gender.f$Gender.Var,"1"="Female","2"="Male","3"="Male+Female")
+gender.m <- gender.region%>%filter(region=="Baniswef"|region=="Ciudad El Triunfo"|region=="El Transito"|region=="Fort Portal"|region=="Gegharkunik region"|region=="Hoima"|region=="Kaduna"|region=="Kamwenge"|region=="Kasese"|region=="Kisii")
+gender.m$Gender.Var1 <- recode(gender.f$Gender.Var,"1"="Female","2"="Male","3"="Male+Female")
+
+# plot top 10 proportional countries male and female
+gender.fc <- gender.country%>%filter(country=="Philippines"|country=="Kenya"|country=="Cambodia"|country=="Pakistan"|country=="Colombia"|country=="Tajikistan"|country=="El Salvador"|country=="Ecuador"|country=="Vietnam"|country=="Nicaragua")
+gender.fc$Gender.Var1 <- recode(gender.fc$Gender.Var,"1"="Female","2"="Male","3"="Male+Female")
+gender.mc <- gender.country%>%filter(country=="Uganda"|country=="Palestine"|country=="Nigeria"|country=="Mozambique"|country=="Azerbaijan"|country=="Yemen"|country=="Albania"|country=="Egypt"|country=="Mongolia"|country=="Zambia")
+gender.mc$Gender.Var1 <- recode(gender.fc$Gender.Var,"1"="Female","2"="Male","3"="Male+Female")
+
+#ordered by total loan frequency region
+topf.plot <- ggplot(gender.f, aes(fill=Gender.Var1, y=Frequency, x=reorder(region,-Frequency)))+geom_bar(stat="identity",position="fill")+scale_fill_manual(values=c("#99CCFF","#006699","#66CC33"))+guides(fill=guide_legend(title="Gender"))+theme(text=element_text(size=19),axis.text.x=element_text(angle=30, hjust=1))+labs(title = "Highest Number of Female Loans",subtitle = "", y="",x="")+theme(plot.title = element_text(hjust=0.5))
+topm.plot<-ggplot(gender.m, aes(fill=Gender.Var1, y=Frequency, x=reorder(region,-Frequency)))+geom_bar(stat="identity",position="fill")+scale_fill_manual(values=c("#99CCFF","#006699","#66CC33"))+guides(fill=guide_legend(title="Gender"))+theme(text=element_text(size=19),axis.text.x=element_text(angle=30, hjust=1))+labs(title = "Highest Number of Male Loans", subtitle = "", y="",x="")+theme(plot.title = element_text(hjust=0.5))
+
+#ordered by total loan frequency country
+topfc.plot <- ggplot(gender.fc, aes(fill=Gender.Var1, y=Frequency, x=reorder(country,-Frequency)))+geom_bar(stat="identity",position="fill")+scale_fill_manual(values=c("#99CCFF","#006699","#66CC33"))+guides(fill=guide_legend(title="Gender"))+theme(text=element_text(size=19),axis.text.x=element_text(angle=30, hjust=1))+labs(title = "Highest Number of Female Loans",subtitle = "", y="",x="")+theme(plot.title = element_text(hjust=0.5))
+topmc.plot<-ggplot(gender.mc, aes(fill=Gender.Var1, y=Frequency, x=reorder(country,-Frequency)))+geom_bar(stat="identity",position="fill")+scale_fill_manual(values=c("#99CCFF","#006699","#66CC33"))+guides(fill=guide_legend(title="Gender"))+theme(text=element_text(size=19),axis.text.x=element_text(angle=30, hjust=1))+labs(title = "Highest Number of Male Loans", subtitle = "", y="",x="")+theme(plot.title = element_text(hjust=0.5))
+
+grid.arrange(topfc.plot,topmc.plot, nrow=2, bottom="Country",left="Frequency", top=textGrob("",gp=gpar(fontsize=15,font=10)))
+grid.arrange(topf.plot,topm.plot, nrow=2, bottom="Region",left="Frequency", top=textGrob("",gp=gpar(fontsize=15,font=10)))
+
+```
+
 
 
 ```{r, echo=FALSE,fig.height=8, fig.width=15,message=FALSE}
-# Sub-Saharan Africa
-top.3.Africa <- mpi.loan.join.s.d%>%filter(world_region=="Sub-Saharan Africa")
-top.3.Africa1 <- top.3.Africa%>%mutate(allother=ifelse(sector=="Agriculture","Agriculture",ifelse(sector=="Food","Food",ifelse(sector=="Retail","Retail","All Other"))))
+# world_regions
+wr <- mpi.loan.join.s.d
+wr <- mpi.loan.join.s.d%>%mutate(allother=ifelse(sector=="Agriculture","Agriculture",ifelse(sector=="Food","Food",ifelse(sector=="Retail","Retail","All Other"))))
 
 #change order
-top.3.Africa1$allother <- factor(top.3.Africa1$allother, levels = c("All Other","Retail","Food","Agriculture"))
-top.3.Africa1 <- as.data.frame(top.3.Africa1)
+wr$allother <- factor(wr$allother, levels = c("All Other","Retail","Food","Agriculture"))
+wr<- as.data.frame(wr)
 # log scale
-top.3.Africa1$log.funded_amount.sector <- log(top.3.Africa1$funded_amount.sector)
+wr$log.funded_amount.sector <- log(wr$funded_amount.sector)
 
-top.3.p2 <- ggplot(top.3.Africa1, aes(y=log.funded_amount.sector,x=reorder(country,-log.funded_amount.sector),fill=allother))+geom_bar(stat="identity")+guides(fill=guide_legend(title="Sector"))+theme(text=element_text(size=19),axis.text.x=element_text(angle=30, hjust=1))+labs(title = "", subtitle = "", y="",x="")
-
-
-grid.arrange(top.3.p2, nrow=1,left=textGrob("Funded Loans",rot=90, gp=gpar(fontsize=19)),bottom=textGrob("Country", gp=gpar(fontsize=19,font=11)),top=textGrob("Relationship Between Sub-Saharan Africa and Top Sectors ", gp=gpar(fontsize=19,font=11)))
+ggplot(wr, aes(sector, log.funded_amount.sector,color=sector))+geom_boxplot()+guides(fill=guide_legend(title="Sector"))+theme(text=element_text(size=19),axis.text.x=element_text(angle=30, hjust=1))+labs(title = "", subtitle = "", y="",x="")+labs(title = "Distribution of Funded Loans by Sector (Log Scale)", subtitle = "", y="",x="")+theme(plot.title = element_text(hjust=0.5))
 ```
 
-#How are loans being used?
-```{r, echo=FALSE,fig.height=10, fig.width=10,message=FALSE, warning=FALSE}
-# countries with funded loans only
-kl4 <- kiva_loan1%>%filter(funded_amount>0)
-# create data frame
-kl4 <-as.data.frame(table(kiva_loan1$use,kiva_loan1$year))
-colnames(kl4)<-c("use","year","Frequency")
-
-# bar plots of top 5 funded countries per year
-p9 <- kl4%>%filter(year=="2014")%>%top_n(n=5,wt=Frequency)%>%ggplot(aes(x=reorder(use,Frequency),y=Frequency,fill=gender))+geom_bar(stat="identity",fill=" skyblue4")+facet_wrap(~year)+labs(x="",y="")+coord_flip()
-p10 <- kl4%>%filter(year=="2015")%>%top_n(n=5,wt=Frequency)%>%ggplot(aes(x=reorder(use,Frequency),y=Frequency))+geom_bar(stat="identity",fill=" skyblue4")+facet_wrap(~year)+labs(x="",y="")+coord_flip()
-p11 <- kl4%>%filter(year=="2016")%>%top_n(n=5,wt=Frequency)%>%ggplot(aes(x=reorder(use,Frequency),y=Frequency))+geom_bar(stat="identity",fill=" skyblue4")+facet_wrap(~year)+labs(x="",y="")+coord_flip()
-p12 <- kl4%>%filter(year=="2017")%>%top_n(n=5,wt=Frequency)%>%ggplot(aes(x=reorder(use,Frequency),y=Frequency))+geom_bar(stat="identity",fill=" skyblue4")+facet_wrap(~year)+labs(x="",y="")+coord_flip()
-
-grid.arrange(p9,p10,p11,p12, nrow=4, bottom="Frequency",left="Use of Loan", top=textGrob("Top 5 Funded Use of Loans per Year",gp=gpar(fontsize=15,font=10)))
-```
-
-From the bar plots, there is some variation in the use of the loan. For water uses, does this vary by region and become more prominent during dry seasons? If there is an expected dry season can we expect water loans to increase?
-
-##Where is the use of water loan most prevelant?
-```{r, echo=FALSE,message=FALSE,warning=FALSE}
-water <- kiva_loan1%>%filter(funded_amount>0)%>%dplyr::select(country,Water)%>%group_by(country)%>%summarise(watertotal=sum(Water),watercount=n())
-water1 <- water%>%arrange(desc(watercount))%>%slice(1:5)
-plotwater <- ggplot(water1, aes(x=reorder(country,-watercount),y=watercount))+geom_bar(stat="identity",fill="light blue")+scale_fill_manual(values=c("#66CC33"))+theme(plot.title=element_text(hjust =0.5,size=19))+labs(title = "Top 5 Funded Water Loans", y="Frequency",x="Country")
-plotwater
-
-```
 #Loan Breakdown by Gender
 ```{r echo=FALSE, fig.height=8, fig.width=12,warning=FALSE}
 # log transform
@@ -514,3 +489,75 @@ ggplot(kiva_loan1.gr1, aes(x=Gender, y=log.funded)) +
 ```
 
 There was just one loan that had male,female variable for South Asia (in 2014).
+
+```{r}
+ggplot(funded)+geom_density()+aes(x=log.funded,color=factor(Gender.Var))
+```
+
+
+##Models
+What factors play into the loans in different countries/regions
+```{r}
+#require(IDPmisc)
+#fit1.data <- kiva_loan1
+#fit1.data <- NaRV.omit(kiva_loan1)
+#fit1 <- lm(log.funded ~ sector, data=fit1.data)
+#summary(fit1)
+#plot(fit1)
+
+```
+
+
+##Conclusion
+TBD
+Response
+term of loan
+funded or not funded
+funded, partially funded, or not funded
+female vs male probability of getting funded
+type of loan probability of getting funded
+
+how effective are loans? repeat borrowers, type of loan (6 type of loans given)
+
+##Appendix
+Items to look at in the future
+
+##Where is the use of water loan most prevelant?
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+water <- kiva_loan1%>%filter(funded_amount>0)%>%dplyr::select(country,Water)%>%group_by(country)%>%summarise(watertotal=sum(Water),watercount=n())
+water1 <- water%>%arrange(desc(watercount))%>%slice(1:5)
+plotwater <- ggplot(water1, aes(x=reorder(country,-watercount),y=watercount))+geom_bar(stat="identity",fill="light blue")+scale_fill_manual(values=c("#66CC33"))+theme(plot.title=element_text(hjust =0.5,size=19))+labs(title = "Top 5 Funded Water Loans", y="Frequency",x="Country")
+plotwater
+
+```
+
+#How are loans being used?
+```{r, echo=FALSE,fig.height=10, fig.width=10,message=FALSE, warning=FALSE}
+# countries with funded loans only
+kl4 <- kiva_loan1%>%filter(funded_amount>0)
+# create data frame
+kl4 <-as.data.frame(table(kiva_loan1$use,kiva_loan1$year))
+colnames(kl4)<-c("use","year","Frequency")
+
+# bar plots of top 5 funded countries per year
+p9 <- kl4%>%filter(year=="2014")%>%top_n(n=5,wt=Frequency)%>%ggplot(aes(x=reorder(use,Frequency),y=Frequency,fill=gender))+geom_bar(stat="identity",fill=" skyblue4")+facet_wrap(~year)+labs(x="",y="")+coord_flip()
+p10 <- kl4%>%filter(year=="2015")%>%top_n(n=5,wt=Frequency)%>%ggplot(aes(x=reorder(use,Frequency),y=Frequency))+geom_bar(stat="identity",fill=" skyblue4")+facet_wrap(~year)+labs(x="",y="")+coord_flip()
+p11 <- kl4%>%filter(year=="2016")%>%top_n(n=5,wt=Frequency)%>%ggplot(aes(x=reorder(use,Frequency),y=Frequency))+geom_bar(stat="identity",fill=" skyblue4")+facet_wrap(~year)+labs(x="",y="")+coord_flip()
+p12 <- kl4%>%filter(year=="2017")%>%top_n(n=5,wt=Frequency)%>%ggplot(aes(x=reorder(use,Frequency),y=Frequency))+geom_bar(stat="identity",fill=" skyblue4")+facet_wrap(~year)+labs(x="",y="")+coord_flip()
+
+grid.arrange(p9,p10,p11,p12, nrow=4, bottom="Frequency",left="Use of Loan", top=textGrob("Top 5 Funded Use of Loans per Year",gp=gpar(fontsize=15,font=10)))
+```
+
+From the bar plots, there is some variation in the use of the loan. For water uses, does this vary by region and become more prominent during dry seasons? If there is an expected dry season can we expect water loans to increase?
+
+```{r}
+
+#- Most imporverished areas
+#- What is being funded/partially funded/not funded and likelihood?
+#- Female vs. male borrowers and whether having a male in the group affects loan behavior?
+#- Repeat and type of borrowers
+#EDA plot outcome on number of F and number of male and ratio of male count to female count to inform us whether count and proportion make sense. 
+#Does a male impact on the loan. 
+#Number of females might not matter, but once adding in a male that could affect the loan amount.
+#Linear regression model per country on amount of loan for gender
+```
