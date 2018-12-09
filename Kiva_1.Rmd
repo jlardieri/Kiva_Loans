@@ -1,8 +1,8 @@
 ---
 title: "Lardieri Applied Statistical Modeling Midterm Project - Kiva Loans"
 output:
-  html_document: default
   pdf_document: default
+  html_document: default
   word_document: default
 ---
 
@@ -52,6 +52,7 @@ The dataset is sourced and merged from 2 Kaggle datasets; loan detail from Kiva.
 Variables $Partner.ID, Country, Region, World Region, Sector, Activity, Use, Tags, Gender, Tags, Date, Funded Loan Amount, Loan Amount, MPI$
 
 Note that there is more data to be merged that will be relevant to analysis, loan theme by region, human development index, and population below the poverty line in the future. 
+
 #Dataset 1: Kiva Loans
 The dataset contains the majority of the loan detail provided by Kiva. 
 ```{r, echo=FALSE, message=FALSE,warning=FALSE}
@@ -110,9 +111,10 @@ kiva_loan.join.d <- distinct(kiva_loan.join)
 kiva_loan.join.s <- kiva_loan1%>%dplyr::select(funded_amount,loan_amount,country,sector,activity)
 kiva_loan.join.s1 <- distinct(kiva_loan.join.s)
 kiva_loan.join.s.d <- kiva_loan.join.s1%>%group_by(country,sector)%>%mutate(loan_amount.sector=sum(loan_amount),funded_amount.sector=sum(funded_amount))%>%group_by(country,activity)%>%mutate(loan_amount.activity=sum(loan_amount),funded_amount.activity=sum(funded_amount))
-kable_kiva <- kiva_loan1%>%dplyr::select(partner_id, funded_amount,loan_amount,sector, activity,use,tags, country,region,borrower_genders,date)
-kable_kiva_head <- kable_kiva[1:5,]
-kable_styling(kable(kable_kiva_head,full_width=TRUE))
+#kable_kiva <- kiva_loan1%>%dplyr::select(partner_id, funded_amount,loan_amount,sector, activity,use,tags, country,region,borrower_genders,date)
+#kable_kiva_head <- kable_kiva[1:5,]
+#kable_styling(kable(kable_kiva_head,full_width=TRUE))
+head(kiva_loan1)
 ```
 
 #Dataset 2: Multidimensional Poverty Index (MPI) and World Region Detail
@@ -124,8 +126,9 @@ mpi <- read.csv("kiva_mpi_region_locations.csv", na.strings=c("","NA"))
 # select specific columns
 mpi1 <- mpi%>%dplyr::select(country,region,world_region,MPI)%>%na.omit() #mpi also has lat and lon data, would be interesting to create a map
 world.region <- mpi%>%dplyr::select(country,region,world_region)%>%na.omit()
-kable_worldr_head <- mpi1[1:5,]
-kable_styling(kable(kable_worldr_head,full_width=TRUE))
+#kable_worldr_head <- mpi1[1:5,]
+#kable_styling(kable(kable_worldr_head,full_width=TRUE))
+head(mpi1)
 ```
 
 
@@ -165,8 +168,9 @@ mpi.world_region.d3 <-distinct(mpi.world_region.d2)
 #just country and region
 mpi.c.r <- mpi%>%dplyr::select(country,world_region)
 
-kable_merge_head <- mpi.country.join.d[1:5,]
-kable_styling(kable(kable_merge_head,full_width=TRUE))
+#kable_merge_head <- mpi.country.join.d[1:5,]
+#kable_styling(kable(kable_merge_head,full_width=TRUE))
+head(mpi.country.join.d)
 ```
 
 ```{r, echo=FALSE, message=FALSE}
@@ -182,7 +186,7 @@ kable_styling(kable(kable_merge_head,full_width=TRUE))
 
 #The Loans: Distribution of Fully Funded, Partially Funded, and Unfunded Loans
 Not all loans receive full funding. 
-```{r,echo=FALSE,message=FALSE,warning=FALSE}
+```{r,echo=FALSE,message=FALSE,warning=FALSE, fig.width=8}
 #fully funded loans
 sprintf("No. of Fully Funded Loans = %s", nrow(kiva_loan1[kiva_loan1$funded_amount==kiva_loan1$loan_amount,]))
 # unfunded loans
@@ -340,15 +344,18 @@ ggplot(data = kiva_loan1, aes(x = sector, y = log.funded, fill = sector)) +geom_
 From the box plot, there is some variation in the loan amounts among the $sector$s. The Food, Housing, and Personal Use sectors have the lowest medians. This could correspond to what we saw from the treemaps. So, what is the funded loan breakdown for these top sectors for World Region and Country?
 
 #Proportion of Funded Loans for Sectors by World Region 
-```{r, echo=FALSE,fig.height=8, fig.width=10,message=FALSE,warning=FALSE}
+```{r, echo=FALSE,fig.height=8, fig.width=10,message=FALSE}
 par(mfrow=c(2,2))
 sector.subset <- kiva_loan1%>%mutate(allother=ifelse(sector=="Agriculture","Agriculture",ifelse(sector=="Food","Food",ifelse(sector=="Retail","Retail",ifelse(sector=="Housing","Housing",ifelse(sector=="Personal Use","Personal.Use","All Other"))))))
 
 sector.subset <- sector.subset%>%left_join(mpi.c.r,by="country")%>%na.omit()
+sector.subset <- sector.subset%>%dplyr::select(partner_id,funded_amount, sector,country,world_region,allother)
+sector.subset <- distinct(sector.subset)
 
 #change order
 sector.subset$allother <- factor(sector.subset$allother, levels = c("All Other","Retail","Food","Agriculture","Personal.Use","Housing"))
 sector.subset <- as.data.frame(sector.subset)
+sector.subset
 #size is total loan
 #top.3.p <- ggplot(top.3, aes(fill=world_region,y=funded_amount.sector,x=sector))+geom_bar(stat="identity",position="fill")+guides(fill=guide_legend(title="World Region"))+theme(text=element_text(size=19))+labs(title = "", subtitle = "", y="",x="")
 
