@@ -1,9 +1,16 @@
 ---
-title: "Lardieri Applied Statistical Modeling Midterm Project - Kiva Loans"
-output:
-  pdf_document: default
-  html_document: default
-  word_document: default
+output: 
+  pdf_document:
+    latex_engine: pdflatex
+title: "Midterm Project - Kiva.org"
+author: "Jordan Lardieri - Boston University"
+keywords: "kiva, loans, EDA"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+geometry: margin=1in
+fontfamily: mathpazo
+fontsize: 11pt
+# spacing: double
+endnote: no
 ---
 
 ```{r setup, include=FALSE}
@@ -34,24 +41,27 @@ pacman::p_load(
 ```
 
 ![Data Science for Social Good.](image.jpg)
+##
 
 ##Abstract
 My interest is in the social sciences, and the use of data science for social good. From improving global health to city infrastructure, we can use data to help solve major societal issues. In my career, I'd like to contribute to these efforts.
 
-I chose my project because it aligns with this goal. I'm interested in Kiva.org's cause because they empower so many individuals and communities around the world through crowdsourced loans, not donations. Anyone can go to the website, get familiar with someone's story and make a loan contribution. 
-
-![Kiva.org.](kiva.png)
+I chose my project because it aligns with this goal. I'm interested in *Kiva.org's* cause because they empower so many individuals and communities around the world through crowdsourced loans, not donations. Anyone can go to the website, get familiar with someone's story and make a loan contribution. 
 
 Their website has a number of focus areas; women, single parents, conflict zones, water, and education to name a few. As a nonprofit, Kiva's mission is to connect people through lending to help alleviate poverty. Kiva supports 3 million borrowers in more than 80 countries, creating opportunities for individuals, their families, and their communities. 
 
-My project aims to take a deeper look at the Kiva loan data, to see if there are any underlying themes and behaviors that differ between regions and countries. Specifically, is there variation in category and amount of funding and to whom. 
+My project aims to take a deeper look at the Kiva loan data, to see if there are any underlying themes and behaviors that differ between regions and countries. Specifically, is there variation in category and amount of funding and to whom.
+
+![Kiva.org.](kiva.png)
+
 
 ##Method
-The dataset is sourced and merged from 2 Kaggle datasets; loan detail from Kiva.org and regional multidimenisonal poverty index (MPI) detail. It was reshaped to have tag information per row (tags are additional information provided for borrowers, for example, "Elderly","Woman Owned Biz"). 
+The dataset is sourced and merged from 2 Kaggle datasets; loan detail from *Kiva.org* and regional multidimenisonal poverty index (MPI) detail. It was reshaped to have tag information per row (tags are additional information provided for borrowers, for example, "Elderly","Woman Owned Biz"). 
 
 Variables $Partner.ID, Country, Region, World Region, Sector, Activity, Use, Tags, Gender, Tags, Date, Funded Loan Amount, Loan Amount, MPI$
 
 Note that there is more data to be merged that will be relevant to analysis, loan theme by region, human development index, and population below the poverty line in the future. 
+
 
 #Dataset 1: Kiva Loans
 The dataset contains the majority of the loan detail provided by Kiva. 
@@ -207,13 +217,12 @@ ggplot(data=funded, aes(x=log.funded))+geom_histogram(col="black",fill="seagreen
 #d.partial <- ggplot(data=partial, aes(x=log.funded))+geom_histogram(col="black",fill="seagreen3")+theme(plot.title=element_text(hjust =0.5,size=19))+labs(title = "Distribution of Partially Funded Loans (Log Scale)", y="Count",x="exp(Loan Amount)")+scale_x_continuous(breaks=c(3,5,7,11), labels=c(format(exp(3),digits=3),format(exp(5),digits=3),format(exp(7),digits=3),format(exp(11),digits=3)))
 ```
 
-In the dataset, an unfunded loan is $Funded Amount$=$0, a partially funded loan is funded amount<loan amount and fully funded loan is funded amount=loan amount. Over 91% of Kiva loans are fully funded!
+In the dataset, an unfunded loan is $Funded Amount$=$0, a partially funded loan is funded amount is less than loan amount and fully funded loan is funded amount=loan amount. Over 91% of Kiva loans are fully funded!
 From the histogram, the fully funded amounts in the dataset range from about 20 USD to about 5,9875 USD with an average of about 1,100 USD. 
 How does this breakdown by $Country$ and $Region$? Is funding going to the most impoverished areas? What about $Gender$? And $Sector$?
 
 #Frequently Funded Countries and Regions
 ```{r, echo=FALSE,fig.height=8, fig.width=8, message=FALSE}
-par(mfrow=c(2,2))
 
 # countries with fully funded loans only
 kl2 <- kiva_loan1%>%filter(funded_amount==loan_amount)
@@ -355,7 +364,6 @@ sector.subset <- distinct(sector.subset)
 #change order
 sector.subset$allother <- factor(sector.subset$allother, levels = c("All Other","Retail","Food","Agriculture","Personal.Use","Housing"))
 sector.subset <- as.data.frame(sector.subset)
-sector.subset
 #size is total loan
 #top.3.p <- ggplot(top.3, aes(fill=world_region,y=funded_amount.sector,x=sector))+geom_bar(stat="identity",position="fill")+guides(fill=guide_legend(title="World Region"))+theme(text=element_text(size=19))+labs(title = "", subtitle = "", y="",x="")
 
