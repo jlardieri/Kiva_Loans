@@ -27,7 +27,8 @@ pacman::p_load(
 "treemapify",
 "treemap",
 "RColorBrewer",
-"functional"
+"functional",
+"lme4"
 )
   
 ```
@@ -43,9 +44,7 @@ I chose my project because it aligns with this goal. I'm interested in Kiva.org'
 
 Their website has a number of focus areas; women, single parents, conflict zones, water, and education to name a few. As a nonprofit, Kiva's mission is to connect people through lending to help alleviate poverty. Kiva supports 3 million borrowers in more than 80 countries, creating opportunities for individuals, their families, and their communities. 
 
-My project aims to take a deeper look at the Kiva loan data, to see if there are any underlying themes or behaviors that differ between regions and countries. Specifically, is there variation in category and amount of funding and to whom. 
-
-Multilevel model consider country as random effect and gender as random slope (if gender does in fact make a difference on amount from EDA)
+My project aims to take a deeper look at the Kiva loan data, to see if there are any underlying themes and behaviors that differ between regions and countries. Specifically, is there variation in category and amount of funding and to whom. 
 
 ##Method
 The dataset is sourced and merged from 2 Kaggle datasets; loan detail from Kiva.org and regional multidimenisonal poverty index (MPI) detail. It was reshaped to have tag information per row (tags are additional information provided for borrowers, for example, "Elderly","Woman Owned Biz"). 
@@ -163,6 +162,9 @@ mpi.world_region.d1 <- mpi.world_region.d%>%group_by(world_region)%>%mutate(suml
 mpi.world_region.d2 <- mpi.world_region.d1%>%dplyr::select(world_region,sumloan_amount.region,sumfunded_amount.region,MPI_region)
 mpi.world_region.d3 <-distinct(mpi.world_region.d2)
 
+#just country and region
+mpi.c.r <- mpi%>%dplyr::select(country,world_region)
+
 kable_merge_head <- mpi.country.join.d[1:5,]
 kable_styling(kable(kable_merge_head,full_width=TRUE))
 ```
@@ -201,11 +203,9 @@ ggplot(data=funded, aes(x=log.funded))+geom_histogram(col="black",fill="seagreen
 #d.partial <- ggplot(data=partial, aes(x=log.funded))+geom_histogram(col="black",fill="seagreen3")+theme(plot.title=element_text(hjust =0.5,size=19))+labs(title = "Distribution of Partially Funded Loans (Log Scale)", y="Count",x="exp(Loan Amount)")+scale_x_continuous(breaks=c(3,5,7,11), labels=c(format(exp(3),digits=3),format(exp(5),digits=3),format(exp(7),digits=3),format(exp(11),digits=3)))
 ```
 
-In the dataset, an unfunded loan is funded amount=$0, a partially funded loan is funded amount<loan amount and fully funded loan is funded amount=loan amount. Over 91% of Kiva loans are fully funded!
-
+In the dataset, an unfunded loan is $Funded Amount$=$0, a partially funded loan is funded amount<loan amount and fully funded loan is funded amount=loan amount. Over 91% of Kiva loans are fully funded!
 From the histogram, the fully funded amounts in the dataset range from about 20 USD to about 5,9875 USD with an average of about 1,100 USD. 
-
-How does this breakdown by Country and Region? Is funding going to the most impoverished areas? What about gender? And sector?
+How does this breakdown by $Country$ and $Region$? Is funding going to the most impoverished areas? What about $Gender$? And $Sector$?
 
 #Frequently Funded Countries and Regions
 ```{r, echo=FALSE,fig.height=8, fig.width=8, message=FALSE}
@@ -245,7 +245,7 @@ grid.arrange(p.k1,p.k2,p.k3,p.k4, nrow=2, bottom="Region",left="Frequency", top=
 
 From the bar plot, there is a mix of top regions that are top funded per year. 
 
-Is there a relationship between frequently funded regions/countries and MPI?
+Is there a relationship between frequently funded regions/countries and $MPI$?
 
 #Funded Loan Amount and Poverty Index (MPI)
 Here we introduce MPI and the 6 World Regions. This includes only regions and countries with an MPI. 
@@ -259,7 +259,7 @@ sprintf("Mean MPI = %.2f", mean(mpi$MPI,na.rm=TRUE))
 ggplot(data=mpi, aes(x=MPI))+geom_histogram(aes(fill=world_region))+theme(plot.title=element_text(hjust =0.5,size=19))+labs(title = "Distribution of Multidimenisonal Poverty Index (MPI)", y="Count",x="MPI")+guides(fill=guide_legend(title="World Region"))
 ```
 
-From distribution, the poorest world regions are Sub-Saharan Africa and South Asia. What proportion of loans are these world regions receiving?
+From distribution, the poorest world regions are Sub-Saharan Africa and South Asia. What proportion of loans are these $World Region$s receiving?
 ```{r, echo=FALSE, fig.height=5,fig.width=12,message=FALSE,warning=FALSE}
 par(mfrow=c(2,2))
 # region breakdown
@@ -274,7 +274,7 @@ mpi.world_region.d3$label <- paste(mpi.world_region.d3$world_region, mpi.world_r
 treemap(mpi.world_region.d3, index="label",vSize="sumfunded_amount.region",vColor="MPI_region",title="Loans by World Region (Total in $M)",title.legend = "Region MPI (mean)", type="value",range=c(0.30,0.05),position.legend= "right", palette=brewer.pal(n=5,"RdYlGn"))
 ```
 
-As we saw from the MPI distribution, Sub-Saharan Africa is the poorest World Region. From the treemap, Sub-Saharan Africa has received a large portion of the total funded loans. While South Asia, high on the poverty index, receives the second smallest portion of funded loans. South Asia might be an area to focus on to identify loan trends. 
+As we saw from the $MPI$ distribution, Sub-Saharan Africa is the poorest $World Region$. From the treemap, Sub-Saharan Africa has received a large portion of the total funded loans. While South Asia, high on the poverty index, receives the second smallest portion of funded loans. South Asia might be an area to focus on to identify loan trends. 
 
 ```{r, echo=FALSE, fig.height=8,fig.width=17,message=FALSE,warning=FALSE}
 # all countries
@@ -301,7 +301,7 @@ From these treemaps, some of the poorest countries are receiving a small portion
 
 Burkina and South Sudan within Sub-Saharan Africa, Haiti within Latin America and Caribbean, and Afghanistan within South Asia are receiving a small portion of the funded amounts.
 
-Again, these areas of focus for loan trends and what is driving these differences. One thing to consider are potential sector and activity differences between the regions/countries. Are certain types of loans more frequent? 
+Again, these areas of focus for loan trends and what is driving these differences. One thing to consider are potential sector and activity differences between the regions/countries. Do the loan needs of the poorer countries cost less than the others? Can we use this to estimate poverty levels and needs for those countries?
 
 #Frequently Funded Sectors
 ```{r, echo=FALSE,fig.height=10, fig.width=10,message=FALSE}
@@ -324,26 +324,40 @@ grid.arrange(p5,p6,p7,p8, nrow=2, bottom="Sector",left="Frequency", top=textGrob
 
 ```
 
-From the bar plots, the top funded sectors are consistently Agriculture, Food, and Retail. What is the funded loan breakdown for these top sectors for World Region and Country?
+From the bar plots, the most frequently funded $sector$s are consistently Agriculture, Food, and Retail. What is the overall loan distribution among the sectors?
 
-#Proportion of Funded Loans for Top Sectors by World Region 
-```{r, echo=FALSE,fig.height=8, fig.width=10,message=FALSE}
+```{r, echo=FALSE,fig.height=8, fig.width=15,message=FALSE,warning=FALSE}
+# world_regions
+#wr <- mpi.loan.join.s.d
+#wr <- mpi.loan.join.s.d%>%mutate(allother=ifelse(sector=="Agriculture","Agriculture",ifelse(sector=="Food","Food",ifelse(sector=="Retail","Retail","All Other"))))
+# log transform
+kiva_loan1$log.funded <- log(kiva_loan1$funded_amount)
+
+ggplot(data = kiva_loan1, aes(x = sector, y = log.funded, fill = sector)) +geom_boxplot() +labs(x = "", y = "Funded Amount",title = "Distribution of Funded Amounts among Sectors")+theme(text=element_text(size=19),axis.text.x=element_text(angle=30, hjust=1))+labs(title = "", subtitle = "", y="",x="")+labs(title = "Distribution of Funded Loans by Sector (Log Scale)", subtitle = "", y="",x="")+theme(plot.title = element_text(hjust=0.5))
+  
+```
+
+From the box plot, there is some variation in the loan amounts among the $sector$s. The Food, Housing, and Personal Use sectors have the lowest medians. This could correspond to what we saw from the treemaps. So, what is the funded loan breakdown for these top sectors for World Region and Country?
+
+#Proportion of Funded Loans for Sectors by World Region 
+```{r, echo=FALSE,fig.height=8, fig.width=10,message=FALSE,warning=FALSE}
 par(mfrow=c(2,2))
-top.3.group <- mpi.loan.join.s.d%>%mutate(allother=ifelse(sector=="Agriculture","Agriculture",ifelse(sector=="Food","Food",ifelse(sector=="Retail","Retail","All Other"))))
+sector.subset <- kiva_loan1%>%mutate(allother=ifelse(sector=="Agriculture","Agriculture",ifelse(sector=="Food","Food",ifelse(sector=="Retail","Retail",ifelse(sector=="Housing","Housing",ifelse(sector=="Personal Use","Personal.Use","All Other"))))))
+
+sector.subset <- sector.subset%>%left_join(mpi.c.r,by="country")%>%na.omit()
 
 #change order
-top.3.group$allother <- factor(top.3.group$allother, levels = c("All Other","Retail","Food","Agriculture"))
-top.3.group <- as.data.frame(top.3.group)
+sector.subset$allother <- factor(sector.subset$allother, levels = c("All Other","Retail","Food","Agriculture","Personal.Use","Housing"))
+sector.subset <- as.data.frame(sector.subset)
 #size is total loan
 #top.3.p <- ggplot(top.3, aes(fill=world_region,y=funded_amount.sector,x=sector))+geom_bar(stat="identity",position="fill")+guides(fill=guide_legend(title="World Region"))+theme(text=element_text(size=19))+labs(title = "", subtitle = "", y="",x="")
 
-top.3.p1 <- ggplot(top.3.group, aes(fill=allother,y=funded_amount.sector,x=world_region))+geom_bar(stat="identity",position="fill")+guides(fill=guide_legend(title="Sector"))+theme(text=element_text(size=19),axis.text.x=element_text(angle=30, hjust=1))+labs(title = "", subtitle = "", y="",x="")
+sector.subset.p <- ggplot(sector.subset, aes(fill=allother,y=funded_amount,x=world_region))+geom_bar(stat="identity",position="fill")+guides(fill=guide_legend(title="Sector"))+theme(text=element_text(size=19),axis.text.x=element_text(angle=30, hjust=1))+labs(title = "", subtitle = "", y="",x="")
 
-grid.arrange(top.3.p1, nrow=1,left=textGrob("Proportion of Funded Loans",rot=90, gp=gpar(fontsize=14)),bottom=textGrob("World Region", gp=gpar(fontsize=14,font=11)),top=textGrob("Relationship Between World Regions and Top Sectors ", gp=gpar(fontsize=14,font=11)))
+grid.arrange(sector.subset.p, nrow=1,left=textGrob("Proportion of Funded Loans",rot=90, gp=gpar(fontsize=14)),bottom=textGrob("World Region", gp=gpar(fontsize=14,font=11)),top=textGrob("Relationship Between World Regions and Top Sectors", gp=gpar(fontsize=14,font=11)))
 ```
 
-The chart indicates that although Agricultural loans are the most frequently funded, they make up a smaller dollar proportion of funded loan amounts. 
-Recalling the treemap by World Region, are there similar breakdowns further by country?
+The chart indicates that Agricultural loans make up a good portion of the funded loan amounts. Recalling both the treemap by World Region and the sector boxplots, I would have expected a larger proportion of Personal Use and Housing within Sub-Saharan Africa and South Asia. (I will revisit this). Now we will take a look how $Gender$ plays a role in the dataset. 
 
 ##Loan Breakdown by Gender
 Now that we have a sense for the loans
@@ -402,38 +416,22 @@ gender.mc <- gender.country%>%filter(country=="Uganda"|country=="Palestine"|coun
 gender.mc$Gender.Var1 <- recode(gender.fc$Gender.Var,"1"="Female","2"="Male","3"="Male+Female")
 
 #ordered by total loan frequency region
-topf.plot <- ggplot(gender.f, aes(fill=Gender.Var1, y=Frequency, x=reorder(region,-Frequency)))+geom_bar(stat="identity",position="fill")+scale_fill_manual(values=c("#99CCFF","#006699","#66CC33"))+guides(fill=guide_legend(title="Gender"))+theme(text=element_text(size=19),axis.text.x=element_text(angle=30, hjust=1))+labs(title = "Highest Number of Female Loans",subtitle = "", y="",x="")+theme(plot.title = element_text(hjust=0.5))
-topm.plot<-ggplot(gender.m, aes(fill=Gender.Var1, y=Frequency, x=reorder(region,-Frequency)))+geom_bar(stat="identity",position="fill")+scale_fill_manual(values=c("#99CCFF","#006699","#66CC33"))+guides(fill=guide_legend(title="Gender"))+theme(text=element_text(size=19),axis.text.x=element_text(angle=30, hjust=1))+labs(title = "Highest Number of Male Loans", subtitle = "", y="",x="")+theme(plot.title = element_text(hjust=0.5))
+topf.plot <- ggplot(gender.f, aes(fill=Gender.Var1, y=Frequency, x=reorder(region,-Frequency)))+geom_bar(stat="identity",position="fill")+scale_fill_manual(values=c("#99CCFF","#006699","#66CC33"))+guides(fill=guide_legend(title="Gender"))+theme(text=element_text(size=19),axis.text.x=element_text(angle=30, hjust=1))+labs(title = "Highest Number of Female Loans",subtitle = "Sorted by Loan Frequency", y="",x="")+theme(plot.title = element_text(hjust=0.5))
+topm.plot<-ggplot(gender.m, aes(fill=Gender.Var1, y=Frequency, x=reorder(region,-Frequency)))+geom_bar(stat="identity",position="fill")+scale_fill_manual(values=c("#99CCFF","#006699","#66CC33"))+guides(fill=guide_legend(title="Gender"))+theme(text=element_text(size=19),axis.text.x=element_text(angle=30, hjust=1))+labs(title = "Highest Number of Male Loans", subtitle = "Sorted by Loan Frequency", y="",x="")+theme(plot.title = element_text(hjust=0.5))
 
 #ordered by total loan frequency country
-topfc.plot <- ggplot(gender.fc, aes(fill=Gender.Var1, y=Frequency, x=reorder(country,-Frequency)))+geom_bar(stat="identity",position="fill")+scale_fill_manual(values=c("#99CCFF","#006699","#66CC33"))+guides(fill=guide_legend(title="Gender"))+theme(text=element_text(size=19),axis.text.x=element_text(angle=30, hjust=1))+labs(title = "Highest Number of Female Loans",subtitle = "", y="",x="")+theme(plot.title = element_text(hjust=0.5))
-topmc.plot<-ggplot(gender.mc, aes(fill=Gender.Var1, y=Frequency, x=reorder(country,-Frequency)))+geom_bar(stat="identity",position="fill")+scale_fill_manual(values=c("#99CCFF","#006699","#66CC33"))+guides(fill=guide_legend(title="Gender"))+theme(text=element_text(size=19),axis.text.x=element_text(angle=30, hjust=1))+labs(title = "Highest Number of Male Loans", subtitle = "", y="",x="")+theme(plot.title = element_text(hjust=0.5))
+topfc.plot <- ggplot(gender.fc, aes(fill=Gender.Var1, y=Frequency, x=reorder(country,-Frequency)))+geom_bar(stat="identity",position="fill")+scale_fill_manual(values=c("#99CCFF","#006699","#66CC33"))+guides(fill=guide_legend(title="Gender"))+theme(text=element_text(size=19),axis.text.x=element_text(angle=30, hjust=1))+labs(title = "Highest Number of Female Loans",subtitle = "Sorted by Loan Frequency", y="",x="")+theme(plot.title = element_text(hjust=0.5))+theme(plot.subtitle  = element_text(hjust=0.5))
+topmc.plot<-ggplot(gender.mc, aes(fill=Gender.Var1, y=Frequency, x=reorder(country,-Frequency)))+geom_bar(stat="identity",position="fill")+scale_fill_manual(values=c("#99CCFF","#006699","#66CC33"))+guides(fill=guide_legend(title="Gender"))+theme(text=element_text(size=19),axis.text.x=element_text(angle=30, hjust=1))+labs(title = "Highest Number of Male Loans", subtitle = "Sorted by Loan Frequency", y="",x="")+theme(plot.title = element_text(hjust=0.5))+theme(plot.subtitle  = element_text(hjust=0.5))
 
 grid.arrange(topfc.plot,topmc.plot, nrow=2, bottom="Country",left="Frequency", top=textGrob("",gp=gpar(fontsize=15,font=10)))
 grid.arrange(topf.plot,topm.plot, nrow=2, bottom="Region",left="Frequency", top=textGrob("",gp=gpar(fontsize=15,font=10)))
 
 ```
 
-
-
-```{r, echo=FALSE,fig.height=8, fig.width=15,message=FALSE}
-# world_regions
-wr <- mpi.loan.join.s.d
-wr <- mpi.loan.join.s.d%>%mutate(allother=ifelse(sector=="Agriculture","Agriculture",ifelse(sector=="Food","Food",ifelse(sector=="Retail","Retail","All Other"))))
-
-#change order
-wr$allother <- factor(wr$allother, levels = c("All Other","Retail","Food","Agriculture"))
-wr<- as.data.frame(wr)
-# log scale
-wr$log.funded_amount.sector <- log(wr$funded_amount.sector)
-
-ggplot(wr, aes(sector, log.funded_amount.sector,color=sector))+geom_boxplot()+guides(fill=guide_legend(title="Sector"))+theme(text=element_text(size=19),axis.text.x=element_text(angle=30, hjust=1))+labs(title = "", subtitle = "", y="",x="")+labs(title = "Distribution of Funded Loans by Sector (Log Scale)", subtitle = "", y="",x="")+theme(plot.title = element_text(hjust=0.5))
-```
+These charts provide good summaries for the $Gender$ differences across countries and regions. There are clear differences among the countries and regions for who is taking out the loan. 
 
 #Loan Breakdown by Gender
 ```{r echo=FALSE, fig.height=8, fig.width=12,warning=FALSE}
-# log transform
-kiva_loan1$log.funded <- log(kiva_loan1$funded_amount)
 
 # recode female,male and male,female as the same
 kiva_loan1$Gender <- recode(kiva_loan1$Gender, "female,male"="male,female")
@@ -488,17 +486,25 @@ ggplot(kiva_loan1.gr1, aes(x=Gender, y=log.funded)) +
     scale_fill_brewer(palette="Set3")+guides(fill=guide_legend(title="Gender"))+theme(text=element_text(size=16))+facet_wrap(~world_region)
 ```
 
-There was just one loan that had male,female variable for South Asia (in 2014).
+There was just one loan that had male,female variable for South Asia (in 2014). (We will revisit this in more detail in our modeling)
 
-```{r}
+```{r, echo=FALSE, fig.height=7, fig.width=10,warning=FALSE}
 ggplot(funded)+geom_density()+aes(x=log.funded,color=factor(Gender.Var))
 ```
 
 
-##Models
-What factors play into the loans in different countries/regions
-```{r}
-#require(IDPmisc)
+##Multilevel Model
+This is a work in progress. There are many different levels to this dataset. 
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+require(IDPmisc)
+fit1.data <- kiva_loan1
+fit1.data <- NaRV.omit(kiva_loan1) # remove inf values from log scale
+fit.multi <- lmer(log.funded ~ Gender.Var + sector + (1+Gender.Var|country),data=fit1.data)
+summary(fit.multi)
+```
+
+
+```{r, echo=FALSE,warning=FALSE,message=FALSE}
 #fit1.data <- kiva_loan1
 #fit1.data <- NaRV.omit(kiva_loan1)
 #fit1 <- lm(log.funded ~ sector, data=fit1.data)
@@ -508,19 +514,11 @@ What factors play into the loans in different countries/regions
 ```
 
 
-##Conclusion
-TBD
-Response
-term of loan
-funded or not funded
-funded, partially funded, or not funded
-female vs male probability of getting funded
-type of loan probability of getting funded
-
-how effective are loans? repeat borrowers, type of loan (6 type of loans given)
+##Conclusion/Next Steps
+There is a lot to consider in this analysis. This project is ongoing and will be diving deeper into modeling next. It is important to understand the underlying themes and behaviors that differ between regions and countries. This data can help Kiva in supporting these areas. 
 
 ##Appendix
-Items to look at in the future
+Items to look at in the future:
 
 ##Where is the use of water loan most prevelant?
 ```{r, echo=FALSE,message=FALSE,warning=FALSE}
