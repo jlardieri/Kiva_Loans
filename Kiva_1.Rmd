@@ -513,7 +513,7 @@ ggplot(funded)+geom_density()+aes(x=log.funded,color=factor(Gender.Var))
 
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-#fit.data <- kiva_loan1
+fit.data <- kiva_loan1
 #simple regression
 #lm.fit <- lm(log.funded ~ factor(Gender.Var) + sector + country, data = fit.data)
 #display(lm.fit)
@@ -535,7 +535,7 @@ Will take a look at outcome of all $sector$ types and how $MPI$ is asssociated w
 ##Multilevel Model
 Here we will look at funded loan amount (log scale) as the outcome, sector as predictor, and gender+country as random effects.
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-fit.multi <- lmer(log.funded ~ sector + (1+factor(Gender.Var)|country),data=fit1.data)
+fit.multi <- lmer(log.funded ~ sector + (1+factor(Gender.Var)|country),data=fit.data)
 #summary(fit.multi)
 ranef(fit.multi)$country[order(ranef(fit.multi)$country[,2]),] #this orders country from more female dominated to more male dominated countries based on log.funded. The top 10 male dominated countries are: Nepal, Pakistan, Liberia, Myanmar (Burma), Togo, South Sudan, Sierra Leone, Haiti, Samoa, and Lao People's Democratic Republic
 
