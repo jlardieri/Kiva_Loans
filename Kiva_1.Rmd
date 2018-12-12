@@ -48,7 +48,7 @@ My interest is in the social sciences, and the use of data science for social go
 
 I chose my project because it aligns with this goal. I'm interested in *Kiva.org's* cause because they empower so many individuals and communities around the world through crowdsourced loans, not donations. Anyone can go to the website, get familiar with someone's story and make a loan contribution. 
 
-Their website has a number of focus areas; women, single parents, conflict zones, water, and education to name a few. As a nonprofit, Kiva's mission is to connect people through lending to help alleviate poverty. Kiva supports 3 million borrowers in more than 80 countries, creating opportunities for individuals, their families, and their communities. 
+Their website has a number of focus areas; women, single parents, conflict zones, water, and education to name a few. As a nonprofit, *Kiva's* mission is to connect people through lending to help alleviate poverty. Kiva supports 3 million borrowers in more than 80 countries, creating opportunities for individuals, their families, and their communities. 
 
 My project aims to take a deeper look at the Kiva loan data, to see if there are any underlying themes and behaviors that differ between regions and countries. Specifically, is there variation in category and amount of funding and to whom.
 
@@ -64,7 +64,7 @@ Note that there is more data to be merged that will be relevant to analysis, loa
 
 
 #Dataset 1: Kiva Loans
-The dataset contains the majority of the loan detail provided by Kiva. 
+The dataset contains the majority of the loan detail provided by *Kiva*. 
 ```{r, echo=FALSE, message=FALSE,warning=FALSE}
 # read kiva data
 df<-read.csv("kiva_loans.csv",na.strings = c("","NA"))
@@ -375,7 +375,6 @@ grid.arrange(sector.subset.p, nrow=1,left=textGrob("Proportion of Funded Loans",
 The chart indicates that Agricultural loans make up a good portion of the funded loan amounts. Recalling both the treemap by World Region and the sector boxplots, I would have expected a larger proportion of Personal Use and Housing within Sub-Saharan Africa and South Asia. (I will revisit this). Now we will take a look how $Gender$ plays a role in the dataset. 
 
 ##Loan Breakdown by Gender
-Now that we have a sense for the loans
 ```{r, echo=FALSE, message=FALSE,warning=FALSE,fig.height=10,fig.width=10}
 par(mfrow=c(2, 2))
 
@@ -390,6 +389,9 @@ sprintf("Total Loans - Funded = %.0f%%",100* nrow(kiva_loan1[kiva_loan1$fully.fu
 sprintf("Female Only Loans - Funded = %.0f%%",100*(nrow(kiva_loan1[kiva_loan1$F.only.loan==1&kiva_loan1$fully.funded==1,])/nrow(kiva_loan1[kiva_loan1$F.only.loan==1,])))
 sprintf("Male Only Loans - Funded = %.0f%%",100*(nrow(kiva_loan1[kiva_loan1$M.only.loan==1&kiva_loan1$fully.funded==1,])/nrow(kiva_loan1[kiva_loan1$M.only.loan==1,])))
 sprintf("Female+Male Loans - Funded = %.0f%%",100*(nrow(kiva_loan1[kiva_loan1$M.F.loan==1&kiva_loan1$fully.funded==1,])/nrow(kiva_loan1[kiva_loan1$M.F.loan==1,])))
+
+require(IDPmisc)
+kiva_loan1 <- NaRV.omit(kiva_loan1) # remove inf values from log scale
 
 # chart proportion visual and then breakout by country and region
 detach(package:plyr) #need to detach plyr for grouping to work
@@ -441,11 +443,13 @@ topmc.plot<-ggplot(gender.mc, aes(fill=Gender.Var1, y=Frequency, x=reorder(count
 grid.arrange(topfc.plot,topmc.plot, nrow=2, bottom="Country",left="Frequency", top=textGrob("",gp=gpar(fontsize=15,font=10)))
 grid.arrange(topf.plot,topm.plot, nrow=2, bottom="Region",left="Frequency", top=textGrob("",gp=gpar(fontsize=15,font=10)))
 
+# update this to be log.funded to see if it corresponds to the model
 ```
 
 These charts provide good summaries for the $Gender$ differences across countries and regions. There are clear differences among the countries and regions for who is taking out the loan. 
 
-#Loan Breakdown by Gender
+We will also want to consider if the average loan amount differs between $Gender$ across $Country$. 
+
 ```{r echo=FALSE, fig.height=8, fig.width=12,warning=FALSE}
 
 # recode female,male and male,female as the same
@@ -508,17 +512,55 @@ ggplot(funded)+geom_density()+aes(x=log.funded,color=factor(Gender.Var))
 ```
 
 
-##Multilevel Model
-This is a work in progress. There are many different levels to this dataset. 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-require(IDPmisc)
-fit1.data <- kiva_loan1
-fit1.data <- NaRV.omit(kiva_loan1) # remove inf values from log scale
-fit.multi <- lmer(log.funded ~ Gender.Var + sector + (1+Gender.Var|country),data=fit1.data)
-summary(fit.multi)
+#fit.data <- kiva_loan1
+#simple regression
+#lm.fit <- lm(log.funded ~ factor(Gender.Var) + sector + country, data = fit.data)
+#display(lm.fit)
 ```
 
+##Logistic Regression
+Will take a look at logistic regression for specific $sector$s of interest. For example, Agriculture or not Agriculture outcome on $MPI$. 
+```{r,echo=FALSE}
+# can look at logistic regression for agriculture or not agriculture outcome on MPI
+```
 
+##Multinomial Model with Random Effect
+Will take a look at outcome of all $sector$ types and how $MPI$ is asssociated with them. $Sector$ as outcome and $MPI$ as predictor and a random effect. 
+```{r,echo=FALSE}
+# to look at outcome of all types of sectors and how MPI is associated with the sectors you can have sector as outcome and MPI as predictor and random effect
+# multilevel with multinomial model, there are specific packages outside of lme, wrape around stan
+```
+
+##Multilevel Model
+Here we will look at funded loan amount (log scale) as the outcome, sector as predictor, and gender+country as random effects.
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+fit.multi <- lmer(log.funded ~ sector + (1+factor(Gender.Var)|country),data=fit1.data)
+#summary(fit.multi)
+ranef(fit.multi)$country[order(ranef(fit.multi)$country[,2]),] #this orders country from more female dominated to more male dominated countries based on log.funded. The top 10 male dominated countries are: Nepal, Pakistan, Liberia, Myanmar (Burma), Togo, South Sudan, Sierra Leone, Haiti, Samoa, and Lao People's Democratic Republic
+
+# so although we see a high frequency of loans for women in Pakistan the average loan is less
+#mean(kiva_loan1[which(kiva_loan1[,27]==2 & kiva_loan1[,6]=="Paraguay"),29])
+#mean(kiva_loan1[which(kiva_loan1[,27]==1 & kiva_loan1[,6]=="Paraguay"),29])
+
+# maybe model frequency rather than amount?
+```
+
+This orders country from more female dominated to more male dominated based on funded amount (log scale). The top 10 average loan amounts for male dominated countries are: Nepal, Pakistan, Liberia, Myanmar (Burma), Togo, South Sudan, Sierra Leone, Haiti, Samoa, and Lao People's Democratic Republic. (Will look into this more)
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# variability among loan amounts across countries for sector/activity and gender
+# MPI can have effect on the sector/activity loan
+# interaction between gender:country ?
+# rather than log have average funded?
+# sector intereaciton in gender if we can fit mihgt be interesting. 
+
+#ranef(fit.multi)
+#ranef(fit.multi)$country
+# top 10 male dominanated        
+```
+
+This is a work in progress. There are many different levels to this dataset. 
 ```{r, echo=FALSE,warning=FALSE,message=FALSE}
 #fit1.data <- kiva_loan1
 #fit1.data <- NaRV.omit(kiva_loan1)
