@@ -534,7 +534,8 @@ Will take a look at outcome of all $sector$ types and how $MPI$ is asssociated w
 
 ##Multilevel Model
 Here we will look at funded loan amount (log scale) as the outcome, sector as predictor, and gender+country as random effects.
-```{r, echo=FALSE, warning=FALSE, message=FALSE}
+```{r, echo=FALSE,warning=FALSE, message=FALSE}
+options(width = 1000)
 fit.multi <- lmer(log.funded ~ sector + (1+factor(Gender.Var)|country),data=fit.data)
 #summary(fit.multi)
 ranef(fit.multi)$country[order(ranef(fit.multi)$country[,2]),] #this orders country from more female dominated to more male dominated countries based on log.funded. The top 10 male dominated countries are: Nepal, Pakistan, Liberia, Myanmar (Burma), Togo, South Sudan, Sierra Leone, Haiti, Samoa, and Lao People's Democratic Republic
@@ -546,7 +547,7 @@ ranef(fit.multi)$country[order(ranef(fit.multi)$country[,2]),] #this orders coun
 # maybe model frequency rather than amount?
 ```
 
-This orders country from more female dominated to more male dominated based on funded amount (log scale). The top 10 average loan amounts for male dominated countries are: Nepal, Pakistan, Liberia, Myanmar (Burma), Togo, South Sudan, Sierra Leone, Haiti, Samoa, and Lao People's Democratic Republic. (Will look into this more)
+This orders $Gender$ by country from more female dominated to more male dominated based on funded amount (log scale). The top 10 average loan amounts for male versus female are: Nepal, Pakistan, Liberia, Myanmar (Burma), Togo, South Sudan, Sierra Leone, Haiti, Samoa, and Lao People's Democratic Republic. (Will look into this more)
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
 # variability among loan amounts across countries for sector/activity and gender
