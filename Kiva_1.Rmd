@@ -117,6 +117,10 @@ kiva_loan1$Water <- as.integer(grepl(pattern="water",x=kiva_loan1$use))
 kiva_loan.join <- kiva_loan1%>%dplyr::select(loan_amount,funded_amount,country)%>%group_by(country)%>%summarise(sumloan_amount=sum(loan_amount),sumfunded_amount=sum(funded_amount))
 kiva_loan.join.d <- distinct(kiva_loan.join)
 
+# kiva loan sector + country for logistic regression
+kiva_loan.sector <- kiva_loan1%>%dplyr::select(sector,loan_amount,funded_amount,country)%>%group_by(country,sector)%>%summarise(sumloan_amount=sum(loan_amount),sumfunded_amount=sum(funded_amount))
+kiva_loan.sector<- distinct(kiva_loan.sector)
+
 # to join sector and activity with world_region
 kiva_loan.join.s <- kiva_loan1%>%dplyr::select(funded_amount,loan_amount,country,sector,activity)
 kiva_loan.join.s1 <- distinct(kiva_loan.join.s)
@@ -128,17 +132,22 @@ head(kiva_loan1)
 ```
 
 #Dataset 2: Multidimensional Poverty Index (MPI) and World Region Detail
-This dataset contains World Region and MPI variables. 
+This dataset contains $World Region$ and $MPI$ variables. $MPI$ is an index used to measure acute poverty. It is indicated at the location level in the dataset, so we will take an average for $Country$, and $World Region$.
 ```{r,echo=FALSE,message=FALSE}
 # read poverty index for region
 mpi <- read.csv("kiva_mpi_region_locations.csv", na.strings=c("","NA"))
+# joining at country level and MPI at location level
+mpi <- mpi%>%group_by(country)%>%mutate(MPI.c=mean(MPI))
 
-# select specific columns
+# average MPI per world region
+mpi.wr <- mpi%>%group_by(world_region)%>%mutate(MPI.wr=mean(MPI))
+
 mpi1 <- mpi%>%dplyr::select(country,region,world_region,MPI)%>%na.omit() #mpi also has lat and lon data, would be interesting to create a map
+
 world.region <- mpi%>%dplyr::select(country,region,world_region)%>%na.omit()
 #kable_worldr_head <- mpi1[1:5,]
 #kable_styling(kable(kable_worldr_head,full_width=TRUE))
-head(mpi1)
+head(mpi)
 ```
 
 
@@ -146,7 +155,12 @@ head(mpi1)
 This is one iteration of the dataset. I summarized loans and MPI separately by world region, region, and country for analysis. 
 ```{r,echo=FALSE, message=FALSE,warning=FALSE}
 #join by country and omit nas (Country + Region + World Region + MPI + Loan by Country)
-mpi.loan.join <- mpi1%>%left_join(kiva_loan.join.d,by="country")%>%na.omit()
+mpi.loan.join <- mpi%>%left_join(kiva_loan.join.d,by="country")%>%na.omit()
+
+# join sector country grouping from Kiva data with MPI for logistic regression
+mpi.sector.country <-mpi%>%left_join(kiva_loan.sector,by="country")%>%na.omit()
+mpi.sector.country <- mpi.sector.country%>%dplyr::select(country,sector,MPI.c,sumloan_amount,sumfunded_amount)
+mpi.sector.country <- distinct(mpi.sector.country)
 
 #convert loan amount into millions
 mpi.loan.join$sumloan_amount <-format(mpi.loan.join$sumloan_amount/1e6,digits=2)
@@ -308,6 +322,8 @@ treemap(mpi.country.LA, index="label",vSize="sumfunded_amount",vColor="MPI_count
 mpi.country.SA <- filter(mpi.loan.country.region.d, world_region=="South Asia")
 mpi.country.SA$label <- paste(mpi.country.SA$country, mpi.country.SA$sumfunded_amount, sep=", ")
 treemap(mpi.country.SA, index="label",vSize="sumfunded_amount",vColor="MPI_country",title="Loans by Country in South Asia (Total in $M)",title.legend = "Country MPI (mean)", type="value",range=c(0.50,0.20),position.legend= "right", palette=brewer.pal(n=5,"RdYlGn"))
+
+#can improve by adding actual map and color MPI scale on countries
 ```
 
 From these treemaps, some of the poorest countries are receiving a small portion of the total Kiva loans. Can see the darker green more prominent in the lower most corner. 
@@ -350,7 +366,9 @@ ggplot(data = kiva_loan1, aes(x = sector, y = log.funded, fill = sector)) +geom_
   
 ```
 
-From the box plot, there is some variation in the loan amounts among the $sector$s. The Food, Housing, and Personal Use sectors have the lowest medians. This could correspond to what we saw from the treemaps. So, what is the funded loan breakdown for these top sectors for World Region and Country?
+From the box plot, there is some variation in the loan amounts among the $sector$s. The Food, Housing, and Personal Use sectors have the lowest medians. This could correspond to what we saw from the treemaps. We can hypothesize that this may indicate that borrowers in these sectors are poorer (higher MPI) and need smaller loan amounts for their needs. Not necessarily true, but modeling this will give us better insight. 
+
+So, what is the funded loan breakdown for these top sectors for World Region and Country?
 
 #Proportion of Funded Loans for Sectors by World Region 
 ```{r, echo=FALSE,fig.height=8, fig.width=10,message=FALSE}
@@ -495,17 +513,14 @@ We may see something interesting across World Regions and Countries.
 # need to join mpi for world region information with gender
 kiva_loan1.red <- kiva_loan1%>%dplyr::select(partner_id, funded_amount, loan_amount, sector, activity, country, use, term_in_months, year, tags, Gender, Gender.Var, Water, log.funded)
 
-kiva_loan1.gr <- world.region%>%left_join(kiva_loan1.red,by="country")%>%na.omit()
-kiva_loan1.gr1 <- kiva_loan1.gr%>%filter(kiva_loan1.gr$world_region=="South Asia"|kiva_loan1.gr$world_region=="Sub-Saharan Africa")
+#kiva_loan1.gr <- world.region%>%left_join(kiva_loan1.red,by="country")%>%na.omit()
+#kiva_loan1.gr1 <- kiva_loan1.gr%>%filter(kiva_loan1.gr$world_region=="South Asia"|kiva_loan1.gr$world_region=="Sub-Saharan Africa")
 
 # add face_wrap by world_region
-ggplot(kiva_loan1.gr1, aes(x=Gender, y=log.funded)) + 
-  geom_violin()+labs(title = "", y="",x="")+
-  stat_summary(fun.y=mean, geom="point", shape=20, size=10, color="red", fill="red") +
-    scale_fill_brewer(palette="Set3")+guides(fill=guide_legend(title="Gender"))+theme(text=element_text(size=16))+facet_wrap(~world_region)
-```
+#ggplot(kiva_loan1.gr1, aes(x=Gender, y=log.funded)) +  geom_violin()+labs(title = "", y="",x="")+stat_summary(fun.y=mean, geom="point", shape=20, size=10, color="red", fill="red") +scale_fill_brewer(palette="Set3")+guides(fill=guide_legend(title="Gender"))+theme(text=element_text(size=16))+facet_wrap(~world_region)
 
-There was just one loan that had male,female variable for South Asia (in 2014). (We will revisit this in more detail in our modeling)
+#There was just one loan that had male,female variable for South Asia (in 2014). (We will revisit this in more detail in our modeling) 
+```
 
 ```{r, echo=FALSE, fig.height=7, fig.width=10,warning=FALSE}
 ggplot(funded)+geom_density()+aes(x=log.funded,color=factor(Gender.Var))
@@ -519,11 +534,22 @@ fit.data <- kiva_loan1
 #display(lm.fit)
 ```
 
-##Logistic Regression
-Will take a look at logistic regression for specific $sector$s of interest. For example, Agriculture or not Agriculture outcome on $MPI$. 
-```{r,echo=FALSE}
-# can look at logistic regression for agriculture or not agriculture outcome on MPI
+##Binomial Logistic Regression
+We will take a look at logistic regression for specific $sector$s of interest. Using the boxplots, we hypothesized that Food, Housing, and Personal Use loans could be an indicator of poverty (higher $MPI$). A logistic regression model may be useful in seeing this relationship. Sectors are grouped as *Not* Food, Housing, Personal Use and Food, Housing, Personal Use as binary outcomes (0 or 1).
+```{r,echo=FALSE,warning=FALSE,message=FALSE}
+# Food, Housing, and Personal Use Loans vs. Not
+logistic.data <- mpi.sector.country%>%mutate(Sector.Var=ifelse(sector=="Food",1,ifelse(sector=="Housing",1,ifelse(sector=="Personal Use",1,0))))
+
+# log scale
+logistic.data$log.funded <- log(logistic.data$sumfunded_amount)
+
+lm<-glm(Sector.Var ~ MPI.c+country,data = logistic.data,family = binomial)
+summary(lm)
+
 ```
+
+AIC seems a bit high. 
+(Look at Multilevel Binomial Logistic Regression).
 
 ##Multinomial Model with Random Effect
 Will take a look at outcome of all $sector$ types and how $MPI$ is asssociated with them. $Sector$ as outcome and $MPI$ as predictor and a random effect. 
